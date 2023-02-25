@@ -115,6 +115,5 @@ Please PR if you encounter errors.
 
 On Linux now, obviously ;).
 
-See the [ane repo](https://github.com/eiln/ane).
-
+Python examples at [aneex](https://github.com/eiln/aneex)
 
