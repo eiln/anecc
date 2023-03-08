@@ -203,13 +203,13 @@ def print_struct(res):
 		print('                .tiles[%d] = %d, /* src%d 0x%x */' % 
 		      (4 + res.dst_count + n, ntiles(res.src_sizes[n]), n, res.src_sizes[n]))
 
-	print('                .types[%d] = TILE_CMD,' % (0))
+	print('                .types[%d] = ANE_TILE_CMD,' % (0))
 	for n in range(res.itm_count):
-		print('                .types[%d] = TILE_ITM,' % (3 + n))
+		print('                .types[%d] = ANE_TILE_ITM,' % (3 + n))
 	for n in range(res.dst_count):
-		print('                .types[%d] = TILE_DST,' % (4 + n))
+		print('                .types[%d] = ANE_TILE_DST,' % (4 + n))
 	for n in range(res.src_count):
-		print('                .types[%d] = TILE_SRC,' % (4 + res.dst_count + n))
+		print('                .types[%d] = ANE_TILE_SRC,' % (4 + res.dst_count + n))
 	print('        },')
 
 	for n in range(res.dst_count):
@@ -255,8 +255,6 @@ def wdata(res, fname):
 
 
 def print_pyane_h(res):
-	if (res.src_count != 1):
-		raise ValueError("todo")
 	print('#ifndef __PYANE_%s_H__' % (res.name.upper()))
 	print('#define __PYANE_%s_H__' % (res.name.upper()))
 	print('')
