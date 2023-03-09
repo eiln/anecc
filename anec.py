@@ -266,6 +266,9 @@ if __name__ == '__main__':
 
 	args = parser.parse_args()
 
+	if (os.path.splitext(args.hwxpath)[1] == ".mlmodel"):
+		print("warning: pass the hwx output of coreml2hwx, not the mlmodel.")
+
 	if (not args.name):
 		args.name = ''.join(os.path.basename(args.hwxpath).rsplit('.hwx', 1))
 	args.name = sanitize(args.name).lower()
