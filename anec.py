@@ -231,8 +231,6 @@ def wstruct(res, fname):
 	with open(fname, "w") as f:
 		f.write('#ifndef __ANEC_%s_H__\n' % (res.name.upper()))
 		f.write('#define __ANEC_%s_H__\n' % (res.name.upper()))
-		f.write('\n')
-		f.write('#include "ane_model.h"\n')
 
 		cap = io.StringIO()
 		with redirect_stdout(cap):
