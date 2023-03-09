@@ -52,22 +52,47 @@ Finally, convert:
 	input = torch.rand(1, 3, 224, 224)  # use correct shape
 	trace = torch.jit.trace(model, input)
 
-	mlmodel = ct.convert(trace, inputs=[name="x", ct.TensorType(shape=input.shape)])
+	mlmodel = ct.convert(trace, inputs=[ct.TensorType(name="x", shape=input.shape)])
 	mlmodel.save("model.mlmodel")
 
 
-Simple runnable example:
 
+Simple runnable example using pretrained weights:
+
+	import coremltools as ct
 	import torch
 	import torchvision
-	import coremltools as ct
 
 	model = torchvision.models.mobilenet_v2(pretrained=True).eval()
 	input = torch.rand(1, 3, 224, 224) 
 	trace = torch.jit.trace(model, input)
 
-	mlmodel = ct.convert(trace, inputs=[name="x", ct.TensorType(shape=input.shape)])
+	mlmodel = ct.convert(trace, inputs=[ct.TensorType(name="x", shape=input.shape)])
 	mlmodel.save("mobilenet.mlmodel")
+
+
+
+Another runnable example but with two inputs:
+
+	import coremltools as ct
+	import torch
+	import torch.nn as nn
+
+	class Atan2(nn.Module):
+	    def __init__(self):
+	        super(Atan2, self).__init__()
+	    def forward(self, x, y):
+	        x = torch.atan2(x, y)
+	        return x
+	model = Atan2().eval()
+
+	input = [torch.rand(1024, 2048), torch.rand(1024, 2048)]  # list of tensors
+	trace = torch.jit.trace(model, input)
+
+	mlmodel = ct.convert(trace, inputs=[ct.TensorType(name="x", shape=input[0].shape),
+                                            ct.TensorType(name="y", shape=input[1].shape)])
+	mlmodel.save("atan2.mlmodel")
+
 
 
 
