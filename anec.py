@@ -243,6 +243,7 @@ def wstruct(res, fname):
 		f.write('extern char _binary_%s_anec_end[];\n' % (res.name))
 		f.write('\n')
 		f.write('#define ane_%s() (ane_register(&anec_%s, &_binary_%s_anec_start))\n' % (res.name, res.name, res.name))
+		f.write('void *pyane_init_%s(void) { return ane_%s(); }\n' % (res.name, res.name))
 		f.write('\n')
 		f.write('#endif /* __ANEC_%s_H__ */\n' % (res.name.upper()))
 	return
@@ -254,52 +255,6 @@ def wdata(res, fname):
 	return
 
 
-def print_pyane_h(res):
-	print('#ifndef __PYANE_%s_H__' % (res.name.upper()))
-	print('#define __PYANE_%s_H__' % (res.name.upper()))
-	print('')
-	print('#include "ane.h"')
-	print('#include "anec_%s.h"' % res.name)
-	print('')
-	print('void *pyane_%s_init(void)' % res.name)
-	print('{')
-	print('        struct ane_nn *nn = ane_%s();' % res.name)
-	print('        return nn;')
-	print('}')
-	print('')
-	print('int pyane_%s_free(struct ane_nn *nn)' % res.name)
-	print('{')
-	print('        ane_destroy(nn);')
-	print('        return 0;')
-	print('}')
-	print('')
-
-	input_s = ', '.join(['void *input%d' % n for n in range(res.src_count)])
-	output_s = ', '.join(['void *output%d' % n for n in range(res.dst_count)])
-	print('int pyane_%s_exec(struct ane_nn *nn, %s, %s)' % (res.name, input_s, output_s))
-	print('{')
-	print('        int err;')
-	for n in range(res.src_count):
-		print('        ane_send(nn, input%d, %d);' % (n, n))
-	print('        err = ane_exec(nn);')
-	for n in range(res.dst_count):
-		print('        ane_read(nn, output%d, %d);' % (n, n))
-	print('        return err;')
-	print('}')
-	print('')
-	print('#endif /* __PYANE_%s_H__ */' % (res.name.upper()))
-	return
-
-
-def wpyane(res, fname):
-	with open(fname, "w") as f:
-		cap = io.StringIO()
-		with redirect_stdout(cap):
-			print_pyane_h(res)
-		f.write(cap.getvalue())
-	return
-
-
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description='convert hwx to anec')
 	parser.add_argument('hwxpath', type=str, help='path to hwx')
@@ -308,7 +263,7 @@ if __name__ == '__main__':
 	parser.add_argument('-a', '--all', action='store_true', help='write all')
 	parser.add_argument('-s', '--struct', action='store_true', help='write struct')
 	parser.add_argument('-d', '--data', action='store_true', help='write data')
-	parser.add_argument('-p', '--pyane', action='store_true', help='write pyane')
+	parser.add_argument('-p', '--print', action='store_true', help='print struct')
 	parser.add_argument('-f', '--force', action='store_true', help='bypass warnings')
 
 	args = parser.parse_args()
@@ -319,6 +274,8 @@ if __name__ == '__main__':
 	print("using name: %s" % args.name)
 
 	res = hwx2anec(args.hwxpath, args.name, args.force)
+	if (args.print):
+		print_struct(res)
 
 	if (args.struct or args.all):
 		fname = os.path.join(args.out, "anec_%s.h" % res.name)
@@ -329,8 +286,3 @@ if __name__ == '__main__':
 		fname = os.path.join(args.out, "%s.anec" % res.name)
 		print("writing data to %s" % fname)
 		wdata(res, fname)
-
-	if (args.pyane or args.all):
-		fname = os.path.join(args.out, "pyane_%s.h" % res.name)
-		print("writing pyane to %s" % fname)
-		wpyane(res, fname)
