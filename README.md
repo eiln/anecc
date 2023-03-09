@@ -115,5 +115,8 @@ Please PR if you encounter errors.
 
 On Linux now, obviously ;).
 
-Python examples at [aneex](https://github.com/eiln/aneex)
+See [aneex](https://github.com/eiln/aneex).
+
+- C-API examples: [aneex/compute](https://github.com/eiln/aneex/tree/main/compute)
+- Python/notebook examples: [aneex/vision](https://github.com/eiln/aneex/tree/main/vision)
 
