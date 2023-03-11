@@ -97,6 +97,8 @@ def hwx2anec(hwxpath, name='', force=False):
 	size = round_up(tsk_size, DMA0_GRAN) + krn_size
 
 	td_size = TD_SIZE  # (0x9c + 1) << 2
+	assert((td_size) and (td_size * 2 < TILE_SIZE))
+
 	pos = next(i for i,x in enumerate(up) if (x == 0x9c))
 	assert(up[pos-2] == BASE_ADDR)
 	td_count = up[pos+1]
