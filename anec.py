@@ -21,6 +21,7 @@ BASE_ADDR = 0x30000000
 TD_SIZE = 0x274
 BAR_SIZE = 0x20
 DMA0_GRAN = 16
+TD_MAGIC = 0xf401f800
 
 class dotdict(dict):  # https://stackoverflow.com/a/23689767/20891128
 	__getattr__ = dict.get
@@ -148,7 +149,7 @@ def hwx2anec(hwxpath, name='', force=False):
 	assert((src_count) and (dst_count) and (itm_count <= 1))
 	res.update({"itm_count": itm_count, "src_count": src_count,  "dst_count": dst_count})
 
-	rnge = [i for i,x in enumerate(up) if (x == 0xf401f800)]
+	rnge = [i for i,x in enumerate(up) if (x == TD_MAGIC)]
 	assert(len(rnge) == td_count)
 	low, high = min(rnge), max(rnge)
 	assert(tsk_size - ((high - low) * 4) == td_size)
