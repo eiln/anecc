@@ -50,7 +50,7 @@ def sanitize(s):  # https://stackoverflow.com/a/3303361/20891128
 
 def get_nchw(hwxpath):
 	stabs = subprocess.Popen(['sh', '-c', 'strings -n 50 "%s" | grep "ar1" | grep ":t.*:5$"' % (hwxpath)], stdout=subprocess.PIPE).communicate()[0].decode().split()
-	if (not stabs): raise ValueError("can't find stabs")
+	assert(len(stabs) >= 2)
 
 	nchw_l = []
 	for i,stab in enumerate(stabs):
