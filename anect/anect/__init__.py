@@ -13,8 +13,8 @@ import os
 import re
 
 logging.basicConfig()
-logger = logging.getLogger('ANEC')
-logger.setLevel(logging.INFO)  # DEBUG INFO
+logger = logging.getLogger('anect')
+logger.setLevel(logging.INFO)
 
 TILE_SIZE = 0x4000
 BASE_ADDR = 0x30000000
@@ -22,6 +22,7 @@ TD_SIZE = 0x274
 BAR_SIZE = 0x20
 DMA0_GRAN = 16
 TD_MAGIC = 0xf401f800
+
 
 class dotdict(dict):  # https://stackoverflow.com/a/23689767/20891128
 	__getattr__ = dict.get
@@ -42,13 +43,8 @@ def ntiles(size):
 	assert(not (size % TILE_SIZE))
 	return (size // TILE_SIZE)
 
-def sanitize(s):  # https://stackoverflow.com/a/3303361/20891128
-	s = re.sub('[^0-9a-zA-Z_]', '', s)  # Remove invalid characters
-	s = re.sub('^[^a-zA-Z_]+', '', s)  # Remove leading characters until we find a letter or underscore
-	return s
 
-
-def get_nchw(hwxpath):
+def _anect_get_nchw(hwxpath):
 	stabs = subprocess.Popen(['sh', '-c', 'strings -n 50 "%s" | grep "ar1" | grep ":t.*:5$"' % (hwxpath)], stdout=subprocess.PIPE).communicate()[0].decode().split()
 	assert(len(stabs) >= 2)
 
@@ -79,11 +75,24 @@ def get_nchw(hwxpath):
 	return nchw_l
 
 
-def hwx2anec(hwxpath, name='', force=False):
+def _anect_get_name(name, hwxpath):
+	if (not name):
+		name = ''.join(os.path.basename(hwxpath).rsplit('.hwx', 1))
+	name = re.sub('[^0-9a-zA-Z_]', '', name)  # Remove invalid characters
+	name = re.sub('^[^a-zA-Z_]+', '', name)  # Remove leading characters until we find a letter or underscore
+	name = name.lower()
+	if (not name):
+		name = "model"
+	logger.info(f'using name: {name}')
+	return name
+
+
+def anect_convert(hwxpath, name="model", force=False):
+	res = dotdict({"path": hwxpath})
+	res.name = _anect_get_name(name, hwxpath)
+
 	data = open(hwxpath, "rb").read()
 	up = unpack_L(data)
-	res = dotdict({"path": hwxpath, "name": name})
-
 
 	first = next(i for i,x in enumerate(up) if (x == BASE_ADDR))
 	pos = next(i for i,x in enumerate(up) if (x == BASE_ADDR) and (i > first))
@@ -157,19 +166,19 @@ def hwx2anec(hwxpath, name='', force=False):
 	res.update({"tsk_start": tsk_start})
 
 
-	res["nchw"] = get_nchw(hwxpath)
+	res["nchw"] = _anect_get_nchw(hwxpath)
 	assert(len(res.nchw) == (src_count + dst_count))
 	for n in range(src_count):
 		nchw = res.nchw[n]
 		size = nchw.N * nchw.C * nchw.pS
 		assert(round_up(size, TILE_SIZE) == res.src_sizes[n])
-		print("found input %d/%d: (%d, %d, %d, %d)" % (n+1, res.src_count, nchw.N, nchw.C, nchw.H, nchw.W))
+		logger.info("found input %d/%d: (%d, %d, %d, %d)" % (n+1, res.src_count, nchw.N, nchw.C, nchw.H, nchw.W))
 
 	for n in range(dst_count):
 		nchw = res.nchw[n + src_count]
 		size = nchw.N * nchw.C * nchw.pS
 		assert(round_up(size, TILE_SIZE) == res.dst_sizes[n])
-		print("found output %d/%d: (%d, %d, %d, %d)" % (n+1, res.dst_count, nchw.N, nchw.C, nchw.H, nchw.W))
+		logger.info("found output %d/%d: (%d, %d, %d, %d)" % (n+1, res.dst_count, nchw.N, nchw.C, nchw.H, nchw.W))
 
 	for stab in res.nchw:
 		if ("ctx_" in stab.name and (res.src_count > 1)):
@@ -181,7 +190,7 @@ def hwx2anec(hwxpath, name='', force=False):
 	return res
 
 
-def print_struct(res):
+def anect_print(res):
 	print('')
 	print('static const struct ane_model anec_%s = {' % res.name)
 	print('        .name = "%s",' % res.name)
@@ -230,14 +239,17 @@ def print_struct(res):
 	return
 
 
-def wstruct(res, fname):
-	with open(fname, "w") as f:
+def _anect_whdr(res, prefix=""):
+	fname = f'anec_{res.name}.h'
+	outpath = os.path.join(prefix, fname)
+	logger.info(f'writing binary to {outpath}')
+	with open(outpath, "w") as f:
 		f.write('#ifndef __ANEC_%s_H__\n' % (res.name.upper()))
 		f.write('#define __ANEC_%s_H__\n' % (res.name.upper()))
 
 		cap = io.StringIO()
 		with redirect_stdout(cap):
-			print_struct(res)
+			anect_print(res)
 		f.write(cap.getvalue())
 
 		f.write('extern char _binary_%s_anec_start[];\n' % (res.name))
@@ -247,46 +259,19 @@ def wstruct(res, fname):
 		f.write('void *pyane_init_%s(void) { return ane_init_%s(); }\n' % (res.name, res.name))
 		f.write('\n')
 		f.write('#endif /* __ANEC_%s_H__ */\n' % (res.name.upper()))
-	return
+	return fname
 
 
-def wdata(res, fname):
+def _anect_wbin(res, prefix=""):
+	fname = f'{res.name}.anec'
+	outpath = os.path.join(prefix, fname)
+	logger.info(f'writing binary to {outpath}')
 	data = open(res.path, "rb").read()
-	open(fname, "wb").write(data[res.tsk_start:res.tsk_start+res.size])
-	return
+	open(outpath, "wb").write(data[res.tsk_start:res.tsk_start+res.size])
+	return fname
 
 
-if __name__ == '__main__':
-	parser = argparse.ArgumentParser(description='convert hwx to anec')
-	parser.add_argument('hwxpath', type=str, help='path to hwx')
-	parser.add_argument('-n', '--name', type=str, help='name')
-	parser.add_argument('-o', '--out', type=str, default='', help='outdir prefix')
-	parser.add_argument('-a', '--all', action='store_true', help='write all')
-	parser.add_argument('-s', '--struct', action='store_true', help='write struct')
-	parser.add_argument('-d', '--data', action='store_true', help='write data')
-	parser.add_argument('-p', '--print', action='store_true', help='print struct')
-	parser.add_argument('-f', '--force', action='store_true', help='bypass warnings')
+def anect_save(res, prefix):
+	_anect_whdr(res, prefix)
+	_anect_wbin(res, prefix)
 
-	args = parser.parse_args()
-
-	if (os.path.splitext(args.hwxpath)[1] == ".mlmodel"):
-		print("warning: pass the hwx output of coreml2hwx, not the mlmodel.")
-
-	if (not args.name):
-		args.name = ''.join(os.path.basename(args.hwxpath).rsplit('.hwx', 1))
-	args.name = sanitize(args.name).lower()
-	print("using name: %s" % args.name)
-
-	res = hwx2anec(args.hwxpath, args.name, args.force)
-	if (args.print):
-		print_struct(res)
-
-	if (args.struct or args.all):
-		fname = os.path.join(args.out, "anec_%s.h" % res.name)
-		print("writing struct to %s" % fname)
-		wstruct(res, fname)
-
-	if (args.data or args.all):
-		fname = os.path.join(args.out, "%s.anec" % res.name)
-		print("writing data to %s" % fname)
-		wdata(res, fname)

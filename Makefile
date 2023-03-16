@@ -1,3 +1,4 @@
 
 install:
-	install anec.py /usr/local/bin/ 
+	make -C anecc
+	make -C anect
