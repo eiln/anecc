@@ -3,18 +3,21 @@
 # SPDX-License-Identifier: MIT
 # Copyright 2022 Eileen Yoon <eyn@gmx.com>
 
-from contextlib import redirect_stdout
+import contextlib
 import subprocess
-import argparse
 import logging
 import struct
 import io
 import os
 import re
 
-logging.basicConfig()
-logger = logging.getLogger('anect')
-logger.setLevel(logging.INFO)
+logging.basicConfig(
+    format='%(name)s::%(levelname)s: %(message)s',
+    level=logging.INFO
+)
+logging.addLevelName(logging.INFO, 'info')
+logging.addLevelName(logging.WARNING, 'warn')
+logger = logging.getLogger(__name__)
 
 TILE_SIZE = 0x4000
 BASE_ADDR = 0x30000000
@@ -42,6 +45,18 @@ def round_down(x, y):
 def ntiles(size):
 	assert(not (size % TILE_SIZE))
 	return (size // TILE_SIZE)
+
+
+def _anect_get_name(name, hwxpath):
+	if (not name):
+		name = os.path.splitext(os.path.basename(hwxpath))[0]
+	name = re.sub('[^0-9a-zA-Z_]', '', name)  # Remove invalid characters
+	name = re.sub('^[^a-zA-Z_]+', '', name)  # Remove leading characters until we find a letter or underscore
+	name = name.lower()
+	if (not name):
+		name = "model"
+	logger.info(f'using name: {name}')
+	return name
 
 
 def _anect_get_nchw(hwxpath):
@@ -75,24 +90,15 @@ def _anect_get_nchw(hwxpath):
 	return nchw_l
 
 
-def _anect_get_name(name, hwxpath):
-	if (not name):
-		name = ''.join(os.path.basename(hwxpath).rsplit('.hwx', 1))
-	name = re.sub('[^0-9a-zA-Z_]', '', name)  # Remove invalid characters
-	name = re.sub('^[^a-zA-Z_]+', '', name)  # Remove leading characters until we find a letter or underscore
-	name = name.lower()
-	if (not name):
-		name = "model"
-	logger.info(f'using name: {name}')
-	return name
-
-
 def anect_convert(hwxpath, name="model", force=False):
+	if (os.path.splitext(hwxpath)[1] == ".mlmodel"):
+		logger.warn("pass the hwx output of coreml2hwx")
+
 	res = dotdict({"path": hwxpath})
 	res.name = _anect_get_name(name, hwxpath)
 
-	data = open(hwxpath, "rb").read()
-	up = unpack_L(data)
+	res.data = open(hwxpath, "rb").read()
+	up = unpack_L(res.data)
 
 	first = next(i for i,x in enumerate(up) if (x == BASE_ADDR))
 	pos = next(i for i,x in enumerate(up) if (x == BASE_ADDR) and (i > first))
@@ -183,7 +189,7 @@ def anect_convert(hwxpath, name="model", force=False):
 	for stab in res.nchw:
 		if ("ctx_" in stab.name and (res.src_count > 1)):
 			if (force):
-				print("bypassing suspected CPU layer warning")
+				logger.warn("bypassing suspected CPU layer warning")
 			else:
 				raise RuntimeError("uh oh, looks like there's an unresolved CPU layer.\n"
 						"              did you really mean %d inputs? use the -f flag to bypass this." % (res.src_count))
@@ -239,16 +245,16 @@ def anect_print(res):
 	return
 
 
-def _anect_whdr(res, prefix=""):
+def _anect_write_hdr(res, prefix=""):
 	fname = f'anec_{res.name}.h'
 	outpath = os.path.join(prefix, fname)
-	logger.info(f'writing binary to {outpath}')
+	logger.info(f'writing header to {outpath}')
 	with open(outpath, "w") as f:
 		f.write('#ifndef __ANEC_%s_H__\n' % (res.name.upper()))
 		f.write('#define __ANEC_%s_H__\n' % (res.name.upper()))
 
 		cap = io.StringIO()
-		with redirect_stdout(cap):
+		with contextlib.redirect_stdout(cap):
 			anect_print(res)
 		f.write(cap.getvalue())
 
@@ -262,16 +268,14 @@ def _anect_whdr(res, prefix=""):
 	return fname
 
 
-def _anect_wbin(res, prefix=""):
+def _anect_write_bin(res, prefix=""):
 	fname = f'{res.name}.anec'
 	outpath = os.path.join(prefix, fname)
 	logger.info(f'writing binary to {outpath}')
-	data = open(res.path, "rb").read()
-	open(outpath, "wb").write(data[res.tsk_start:res.tsk_start+res.size])
+	open(outpath, "wb").write(res.data[res.tsk_start:res.tsk_start+res.size])
 	return fname
 
 
-def anect_save(res, prefix):
-	_anect_whdr(res, prefix)
-	_anect_wbin(res, prefix)
-
+def anect_write(res, prefix):
+	_anect_write_hdr(res, prefix)
+	_anect_write_bin(res, prefix)

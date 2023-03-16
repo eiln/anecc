@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(
     name="anecc",
-    version="1.0.0",
+    version="1.0.3",
     description='ane compiler',
     author='Eileen Yoon',
     author_email='eyn@gmx.com',
