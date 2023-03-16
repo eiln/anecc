@@ -1,3 +1,3 @@
 
 install:
-	sudo cp anec.py /usr/local/bin/ 
+	install anec.py /usr/local/bin/ 
