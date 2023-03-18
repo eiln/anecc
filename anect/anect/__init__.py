@@ -252,6 +252,8 @@ def _anect_write_hdr(res, prefix=""):
 	with open(outpath, "w") as f:
 		f.write('#ifndef __ANEC_%s_H__\n' % (res.name.upper()))
 		f.write('#define __ANEC_%s_H__\n' % (res.name.upper()))
+		f.write('\n')
+		f.write('#include "ane.h"\n')
 
 		cap = io.StringIO()
 		with contextlib.redirect_stdout(cap):

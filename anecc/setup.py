@@ -4,8 +4,8 @@ from setuptools import setup
 
 setup(
     name="anecc",
-    version="1.0.4",
-    description='ane compiler',
+    version="1.0.7",
+    description='ANE compiler',
     author='Eileen Yoon',
     author_email='eyn@gmx.com',
     packages=['anecc'],
