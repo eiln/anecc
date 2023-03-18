@@ -46,9 +46,9 @@ def _anecc_common(path, name, outdir):
 	return (res, name, outdir)
 
 
-def anecc_c(path, name="model", outdir=""):
+def anecc_compile(path, name="model", outdir="", c=True, python=False):
+
 	res, name, outdir = _anecc_common(path, name, outdir)
-	logger.info('compiling for C...')
 
 	with tempfile.TemporaryDirectory() as tmpdir:
 		anect_write(res, prefix=tmpdir)
@@ -60,47 +60,34 @@ def anecc_c(path, name="model", outdir=""):
 		logger.info(cmd)
 		subprocess.run(shlex.split(cmd))
 
-		hdr_path = os.path.join(outdir, anec_hdr)
-		obj_path = os.path.join(outdir, anec_obj)
-		shutil.copyfile(anec_hdr, hdr_path)
-		shutil.copyfile(anec_obj, obj_path)
-		logger.info(f'created header: {hdr_path}')
-		logger.info(f'created object: {obj_path}')
+		if (c):
+			logger.info('compiling for C...')
+			hdr_path = os.path.join(outdir, anec_hdr)
+			obj_path = os.path.join(outdir, anec_obj)
+			shutil.copyfile(anec_hdr, hdr_path)
+			shutil.copyfile(anec_obj, obj_path)
+			logger.info(f'created header: {hdr_path}')
+			logger.info(f'created object: {obj_path}')
 
-	return
+		if (python):
+			logger.info('compiling for Python...')
+			pyane_lib = f'{name}.anec.so'
+			pyane_src = os.path.join(tmpdir, f'pyane_{name}.c')
+			pyane_obj = os.path.join(tmpdir, pyane_lib)
+			with open(pyane_src, "w") as f:
+				f.write(f'#include "pyane.h"\n')
+				f.write(f'#include "{anec_hdr}"\n')
 
+			cmd = f'{CC} -shared -pthread -fPIC -fno-strict-aliasing -I.' \
+				f' -I/{PYTHON_HDR} -I/{LIBDRM_HDR}' \
+				f' -I/{DRIVER_HDR} -I/{ANELIB_HDR}' \
+				f' {ANELIB_OBJ} {anec_obj}' \
+				f' {pyane_src} -o {pyane_obj}'
+			logger.info(cmd)
+			subprocess.run(shlex.split(cmd))
 
-def anecc_py(path, name="model", outdir=""):
-	res, name, outdir = _anecc_common(path, name, outdir)
-	logger.info('compiling for Python...')
-	
-	with tempfile.TemporaryDirectory() as tmpdir:
-		anect_write(res, prefix=tmpdir)
-		os.chdir(tmpdir)
-
-		anec_hdr = f'anec_{name}.h'
-		anec_obj = f'{name}.anec.o'
-		cmd = f'ld -r -b binary -o {anec_obj} {name}.anec'
-		logger.info(cmd)
-		subprocess.run(shlex.split(cmd))
-
-		pyane_lib = f'{name}.anec.so'
-		pyane_src = os.path.join(tmpdir, f'pyane_{name}.c')
-		pyane_obj = os.path.join(tmpdir, pyane_lib)
-		with open(pyane_src, "w") as f:
-			f.write(f'#include "pyane.h"\n')
-			f.write(f'#include "{anec_hdr}"\n')
-
-		cmd = f'{CC} -shared -pthread -fPIC -fno-strict-aliasing -I. \
-			-I/{PYTHON_HDR} -I/{LIBDRM_HDR} \
-			-I/{DRIVER_HDR} -I/{ANELIB_HDR} \
-			{ANELIB_OBJ} {anec_obj} \
-			{pyane_src} -o {pyane_obj}'
-		logger.info(cmd)
-		subprocess.run(shlex.split(cmd))
-
-		lib_path = os.path.join(outdir, pyane_lib)
-		shutil.copyfile(pyane_obj, lib_path)
-		logger.info(f'created dylib: {lib_path}')
+			lib_path = os.path.join(outdir, pyane_lib)
+			shutil.copyfile(pyane_obj, lib_path)
+			logger.info(f'created dylib: {lib_path}')
 
 	return
