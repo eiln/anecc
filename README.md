@@ -71,7 +71,7 @@ Or the real deal, a header + object for C/C-likes:
 Compiled with:
 
 	gcc -I/usr/include/libdrm -I/usr/include/accel?/idk \
-		-I/usr/include/anelib -I/usr/bin/anelib/anelib.o \
+		-I/usr/include/libane /usr/lib/libane.o \
 		yolov5.anec.o main.c -o main.out
 
 
