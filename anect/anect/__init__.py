@@ -262,7 +262,6 @@ def _anect_write_hdr(res, prefix=""):
 		f.write('extern char _binary_%s_anec_end[];\n' % (res.name))
 		f.write('\n')
 		f.write('#define ane_init_%s() (ane_init(&anec_%s, &_binary_%s_anec_start))\n' % (res.name, res.name, res.name))
-		f.write('void *pyane_init_%s(void) { return ane_init_%s(); }\n' % (res.name, res.name))
 		f.write('\n')
 		f.write('#endif /* __ANEC_%s_H__ */\n' % (res.name.upper()))
 	return fname

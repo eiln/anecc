@@ -74,6 +74,7 @@ def anecc_compile(path, name="model", outdir="", c=True, python=False):
 			with open(pyane_src, "w") as f:
 				f.write(f'#include "pyane.h"\n')
 				f.write(f'#include "{anec_hdr}"\n')
+				f.write('void *pyane_init(void) { return ane_init_%s(); }\n' % name)
 
 			cmd = f'{CC} -shared -pthread -fPIC -fno-strict-aliasing -I.' \
 				f' -I/{PYTHON_HDR} -I/{LIBDRM_HDR}' \
