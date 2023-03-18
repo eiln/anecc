@@ -30,25 +30,22 @@ ANELIB_HDR = "/home/eileen/ane/anelib/include"
 ANELIB_OBJ = "/home/eileen/ane/build/anelib.o"
 
 
-def _anecc_common(path, name, outdir):
+def anecc_compile(path, name="model", outdir="", c=True, python=False):
+
 	if (platform.system() != "Linux"):
 		logger.warn("compiling is only supported on Linux.")
+
 	res = anect_convert(path, name=name)
+	name = res.name  # override with sanitized name
+
 	if (platform.system() != "Linux"):
 		logger.warn("Model can convert successfully. Re-run anecc in Linux.")
 		exit(0)
 
-	name = res.name  # override with sanitized name
 	if (not outdir):
 		outdir = os.getcwd()
 	else:
 		outdir = os.path.abspath(outdir)
-	return (res, name, outdir)
-
-
-def anecc_compile(path, name="model", outdir="", c=True, python=False):
-
-	res, name, outdir = _anecc_common(path, name, outdir)
 
 	with tempfile.TemporaryDirectory() as tmpdir:
 		anect_write(res, prefix=tmpdir)
