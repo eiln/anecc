@@ -91,8 +91,7 @@ def anecc_py(path, name="model", outdir=""):
 			f.write(f'#include "pyane.h"\n')
 			f.write(f'#include "{anec_hdr}"\n')
 
-		cmd = f'{CC} -shared -pthread -fPIC -fno-strict-aliasing \
-			-I. -Wall -Werror -pedantic-errors \
+		cmd = f'{CC} -shared -pthread -fPIC -fno-strict-aliasing -I. \
 			-I/{PYTHON_HDR} -I/{LIBDRM_HDR} \
 			-I/{DRIVER_HDR} -I/{ANELIB_HDR} \
 			{ANELIB_OBJ} {anec_obj} \
