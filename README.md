@@ -49,8 +49,8 @@ On MacOS you can execute a MLModel with:
 
 `anecc` compiles a MLModel into either a shared object for Python:
 
-	from ane import ANE_MODEL
-	model = ANE_MODEL("yolov5.anec.so")
+	import ane
+	model = ane.Model("yolov5.anec.so")
 
 
 Or the real deal, a header + object for C/C-likes:
