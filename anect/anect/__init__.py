@@ -50,9 +50,9 @@ def ntiles(size):
 def _anect_get_name(name, hwxpath):
 	if (not name):
 		name = os.path.splitext(os.path.basename(hwxpath))[0]
+	name = name.replace("-", "_").lower()
 	name = re.sub('[^0-9a-zA-Z_]', '', name)  # Remove invalid characters
 	name = re.sub('^[^a-zA-Z_]+', '', name)  # Remove leading characters until we find a letter or underscore
-	name = name.lower()
 	if (not name):
 		name = "model"
 	logger.info(f'using name: {name}')
