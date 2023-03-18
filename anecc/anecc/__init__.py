@@ -26,8 +26,8 @@ CC = "gcc"
 PYTHON_HDR = sysconfig.get_paths()['include']  # "/usr/include/python3.10"
 LIBDRM_HDR = "/usr/include/libdrm"
 DRIVER_HDR = "/home/eileen/ane/ane/src/include"
-ANELIB_HDR = "/home/eileen/ane/anelib/include"
-ANELIB_OBJ = "/home/eileen/ane/build/anelib.o"
+ANELIB_HDR = "/usr/include/anelib"
+ANELIB_OBJ = "/usr/lib/anelib.o"
 
 
 def anecc_compile(path, name="model", outdir="", c=True, python=False):
