@@ -26,8 +26,8 @@ CC = "gcc"
 PYTHON_HDR = sysconfig.get_paths()['include']  # "/usr/include/python3.10"
 LIBDRM_HDR = "/usr/include/libdrm"
 DRIVER_HDR = "/home/eileen/ane/ane/src/include"
-ANELIB_HDR = "/usr/include/anelib"
-ANELIB_OBJ = "/usr/lib/anelib.o"
+LIBANE_HDR = "/usr/include/libane"
+LIBANE_OBJ = "/usr/lib/libane.o"
 
 
 def anecc_compile(path, name="model", outdir="", c=True, python=False):
@@ -78,8 +78,8 @@ def anecc_compile(path, name="model", outdir="", c=True, python=False):
 
 			cmd = f'{CC} -shared -pthread -fPIC -fno-strict-aliasing -I.' \
 				f' -I/{PYTHON_HDR} -I/{LIBDRM_HDR}' \
-				f' -I/{DRIVER_HDR} -I/{ANELIB_HDR}' \
-				f' {ANELIB_OBJ} {anec_obj}' \
+				f' -I/{DRIVER_HDR} -I/{LIBANE_HDR}' \
+				f' {LIBANE_OBJ} {anec_obj}' \
 				f' {pyane_src} -o {pyane_obj}'
 			logger.info(cmd)
 			subprocess.run(shlex.split(cmd))
