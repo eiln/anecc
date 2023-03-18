@@ -33,12 +33,13 @@ Verify installation with:
 	Options:
 	  -n, --name TEXT    Model name.
 	  -o, --outdir TEXT  Output directory prefix.
-	  -p, --python       Compile to python (default C).
+	  -p, --python       Compile to Python (default C).
+	  -a, --all          Compile to both C/Python.
 	  --help             Show this message and exit.
 
 
 
-# What
+## What
 
 On MacOS you can execute a MLModel with:
 
@@ -78,14 +79,15 @@ Todo. Resolve include paths.
 
 
 
-## Conversion
+## How-To
 
 To create or convert your own MLModel,
 you need to start in MacOS, where a CoreML runtime is available.
 You don't need MacOS to run a pre-converted model.
+[TLDR](https://github.com/eiln/anecc#tldr) at the bottom.
 
 
-### Step 0: obtain mlmodel
+### Step 0. Obtain MLModel
 
 
 Starting in MacOS-land.
@@ -94,7 +96,8 @@ See [coreml101.md](coreml101.md).
 I'm continuing "mobilenet.mlmodel" from the torch example.
 
 
-### Step 1: mlmodel -> hwx
+
+### Step 1. coreml2hwx: MLModel -> hwx
 
 
 Still in MacOS-land.
@@ -120,8 +123,7 @@ conversion script, which can be installed with:
 	make install
 
 
-Convert mlmodel -> hwx:
-
+Use `coreml2hwx` to convert mlmodel -> hwx:
 
 	$ coreml2hwx mobilenet.mlmodel 
 	2023-02-15 10:45:59.466 coreml2hwx[986:9634] original mlmodel file: file:///Users/eileen/mobilenet.mlmodel 
@@ -151,34 +153,60 @@ Send me the mlmodel and I'll take a look at it.
 
 
 
-### Step 2: hwx -> anec
+### Step 2. anecc: Convert & Compile
 
-`anecc` parses the hwx, not mlmodel.
-It's nearly free-standing/pure python, with the exception
-of `click` to parse command line arguments,
-so it's runnable both on macos/Linux. Or Windows. I think.
+`anecc` first internally [converts](anect/anect/__init__.py) the hwx
+into a [data structure](https://github.com/eiln/ane/blob/main/ane/src/include/drm_ane.h)
+needed by the driver.
+Then, the "compilation" portion consists of miscellaneous
+`gcc/ld` commands that wrap the data structure nicely.
+
+In other words, the actual work is the conversion.
+Since the hwx format is RE'd, the conversion module
+runs a lot of asserts/checks.
+**Please PR if the conversion fails.**
+
+You can run `anecc` in MacOS to ensure it properly converts,
+but it won't generate the compiled objects.
+E.g., MacOS:
+
+	$ anecc mobilenet.hwx -a
+	anecc::warn: compiling is only supported on Linux.
+	anect::info: using name: mobilenet
+	anect::info: found input 1/1: (1, 3, 224, 224)
+	anect::info: found output 1/1: (1, 1, 1, 1000)
+	anecc::warn: Model can convert successfully. Re-run anecc in Linux.
 
 
-	$ anecc mobilenet.hwx
-	using name: mobilenet
-	found input 1/1: (1, 3, 224, 224)
-	found output 1/1: (1, 1, 1, 1000)
-	writing struct to anec_mobilenet.h
-	writing data to mobilenet.anec
-	writing pyane to pyane_mobilenet.h
+v.s. Linux:
+
+	$ anecc mobilenet.hwx -a
+	anect::info: using name: mobilenet
+	anect::info: found input 1/1: (1, 3, 224, 224)
+	anect::info: found output 1/1: (1, 1, 1, 1000)
+	anect::info: writing header to /tmp/tmpo_kkogf1/anec_mobilenet.h
+	anect::info: writing binary to /tmp/tmpo_kkogf1/mobilenet.anec
+	anecc::info: ld -r -b binary -o mobilenet.anec.o mobilenet.anec
+	anecc::info: compiling for C...
+	anecc::info: created header: /home/eileen/anec_mobilenet.h
+	anecc::info: created object: /home/eileen/mobilenet.anec.o
+	anecc::info: compiling for Python...
+	anecc::info: gcc -shared -pthread -fPIC -fno-strict-aliasing -I. -I//usr/include/python3.10 -I//usr/include/libdrm -I//home/eileen/ane/ane/src/include -I//home/eileen/ane/anelib/include /home/eileen/ane/build/anelib.o mobilenet.anec.o /tmp/tmpo_kkogf1/pyane_mobilenet.c -o /tmp/tmpo_kkogf1/mobilenet.anec.so
+	anecc::info: created dylib: /home/eileen/mobilenet.anec.so
 
 
-Please PR if you encounter errors.
+
+### TLDR
 
 
+In MacOS,
 
-### Step 3: execute!
+	coreml2hwx mobilenet.mlmodel
+	cp /tmp/hwx_output/mobilenet/model.hwx mobilenet.hwx
 
+Save the "mobilenet.hwx" to Linux partition. 
 
-On Linux now, obviously ;).
+Then, in Linux,
 
-See [aneex](https://github.com/eiln/aneex).
-
-- C-API examples: [aneex/compute](https://github.com/eiln/aneex/tree/main/compute)
-- Python/notebook examples: [aneex/vision](https://github.com/eiln/aneex/tree/main/vision)
+	anecc mobilenet.hwx
 
