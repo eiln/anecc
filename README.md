@@ -9,9 +9,13 @@
 converts and compiles an Apple CoreML MLModel
 to a Linux executable compatible with [my new driver](https://github.com/eiln/ane).
 
+Bindings are currently available for 
+[C](#c),
+[C++](#c-1),
+[Python](#python).
 
 
-## Installation
+# Installation
 
 From pip:
 
@@ -33,13 +37,14 @@ Verify installation with:
 	Options:
 	  -n, --name TEXT    Model name.
 	  -o, --outdir TEXT  Output directory prefix.
-	  -p, --python       Compile to Python (default C).
-	  -a, --all          Compile to both C/Python.
+	  -c, --c            Compile to C (default).
+	  -d, --cpp          Compile to C++.
+	  -p, --python       Compile to Python.
+	  -a, --all          Compile to all.
 	  --help             Show this message and exit.
 
 
-
-## What
+# What It Does
 
 On MacOS you can execute a MLModel with:
 
@@ -75,26 +80,29 @@ Compiled with:
 		yolov5.anec.o main.c -o main.out
 
 
-Todo. Resolve include paths.
+TODO. Resolve kernel driver include path.
+
+For details, see [Usage](#usage).
 
 
 
-## How-To
+# Conversion
 
 To create or convert your own MLModel,
 you need to start in MacOS, where a CoreML runtime is available.
+
 You don't need MacOS to run a pre-converted model.
-[TLDR](https://github.com/eiln/anecc#tldr) at the bottom.
+For that, see [Usage](#usage).
+
+[TLDR](#tldr) below.
 
 
 ### Step 0. Obtain MLModel
-
 
 Starting in MacOS-land.
 You should have a "*.mlmodel" file ready.
 See [coreml101.md](coreml101.md).
 I'm continuing "mobilenet.mlmodel" from the torch example.
-
 
 
 ### Step 1. coreml2hwx: MLModel -> hwx
@@ -106,7 +114,6 @@ I kinda lied about the MLModel part.
 When a MLModel file is loaded,
 
 	mlmodel = ct.models.MLModel("path/to/model.mlmodel")
-
 
 the CoreML backend is called to re-compile the
 model specs into one executable on the ANE. Every. Time.
@@ -121,7 +128,6 @@ conversion script, which can be installed with:
 	git clone https://github.com/eiln/coreml_to_ane_hwx
 	cd coreml_to_ane_hwx
 	make install
-
 
 Use `coreml2hwx` to convert mlmodel -> hwx:
 
@@ -142,15 +148,12 @@ Use `coreml2hwx` to convert mlmodel -> hwx:
 	2023-02-15 10:45:59.902 coreml2hwx[986:9634] result at /tmp/hwx_output/mobilenet/model.hwx
 
 
-
 On success should print the hwx path:
 
 	cp /tmp/hwx_output/mobilenet/model.hwx mobilenet.hwx
 
-
 If it doesn't, sorry, I don't know.
 Send me the mlmodel and I'll take a look at it.
-
 
 
 ### Step 2. anecc: Convert & Compile
@@ -177,7 +180,6 @@ E.g., MacOS:
 	anect::info: found output 1/1: (1, 1, 1, 1000)
 	anecc::warn: Model can convert successfully. Re-run anecc in Linux.
 
-
 v.s. Linux:
 
 	$ anecc mobilenet.hwx -a
@@ -190,14 +192,16 @@ v.s. Linux:
 	anecc::info: compiling for C...
 	anecc::info: created header: /home/eileen/anec_mobilenet.h
 	anecc::info: created object: /home/eileen/mobilenet.anec.o
+	anecc::info: compiling for C++...
+	anecc::info: gcc -I//usr/include/libdrm -I//home/eileen/ane/ane/src/include -I//usr/include/libane -c -o /tmp/tmpo_kkogf1/anecpp_mobilenet.o /tmp/tmpo_kkogf1/anecpp_mobilenet.c
+	anecc::info: created cpp object: /home/eileen/anecpp_mobilenet.o
+	anecc::info: created hpp header: /home/eileen/anecpp_mobilenet.hpp
 	anecc::info: compiling for Python...
-	anecc::info: gcc -shared -pthread -fPIC -fno-strict-aliasing -I. -I//usr/include/python3.10 -I//usr/include/libdrm -I//home/eileen/ane/ane/src/include -I//home/eileen/ane/anelib/include /home/eileen/ane/build/anelib.o mobilenet.anec.o /tmp/tmpo_kkogf1/pyane_mobilenet.c -o /tmp/tmpo_kkogf1/mobilenet.anec.so
-	anecc::info: created dylib: /home/eileen/mobilenet.anec.so
+	anecc::info: gcc -shared -pthread -fPIC -fno-strict-aliasing -I. -I//usr/include/python3.10 -I//usr/include/libdrm -I//home/eileen/ane/ane/src/include -I//usr/include/libane /usr/lib/libane.o mobilenet.anec.o /tmp/tmpo_kkogf1/pyane_mobilenet.c -o /tmp/tmpo_kkogf1/mobilenet.anec.so
+	anecc::info: created dylib oject: /home/eileen/mobilenet.anec.so
 
 
-
-### TLDR
-
+## TLDR
 
 In MacOS,
 
@@ -209,4 +213,104 @@ Save the "mobilenet.hwx" to Linux partition.
 Then, in Linux,
 
 	anecc mobilenet.hwx
+
+
+# Usage
+
+### C
+
+	anecc --c yolov5.hwx
+
+Generates 
+
+	anec_$name.h, $name.anec.o
+
+
+The header defines `anec_init_$name()`,
+which can be used as:
+
+	#include "ane.h"
+	#include "anec_yolov5.h" // anec_$name.h 
+
+	int main(void) {
+		struct ane_nn *nn = ane_init_yolov5(); // anec_init_$name()
+		if (nn == NULL) {
+			return -1;
+		}
+		// ...
+		ane_free(nn);
+		return 0;
+	}
+
+Compile with:
+
+	gcc -I/usr/include/libdrm -I/usr/include/accel?/idk \
+		-I/usr/include/libane /usr/lib/libane.o \
+		yolov5.anec.o main.c -o main.out
+
+See the `libane` [source](https://github.com/eiln/ane/tree/main/libane).
+TODO. Document this.
+
+
+### C++
+
+	anecc --cpp yolov5.hwx
+
+Generates 
+
+	anecpp_$name.hpp, $name.anec.o, anecpp_$name.o
+
+
+The header defines `anecpp_init_$name()`,
+which can be used as:
+
+	#include "ane.h"
+	#include "anecpp_yolov5.hpp" // anecpp_$name.hpp
+
+	int main(void) {
+		struct ane_nn *nn = anecpp_init_yolov5(); // anecpp_init_$name()
+		if (nn == NULL) {
+			return -1;
+		}
+		// ...
+		ane_free(nn);
+		return 0;
+	}
+
+Compile with:
+
+	g++ -I/usr/include/libdrm -I/usr/include/accel?/idk \
+		-I/usr/include/libane /usr/lib/libane.o \
+		yolov5.anec.o anecpp_yolov5.o main.cpp -o main.out
+
+Other `libane` functions are the same as C.
+
+
+### Python
+
+	anecc --python yolov5.hwx
+
+Generates 
+
+	$name.anec.so
+
+
+Backend is the [ane](https://github.com/eiln/ane/tree/main/python)
+package, which can be installed with:
+
+	pip install ane
+
+
+Load the dylib with:
+
+	import ane  # pip install ane
+	model = ane.Model("yolov5.anec.so")  # $name.anec.so 
+
+
+### Jupyter Notebook
+
+Everything is the same as normal Python,
+but you NEED to **RESTART THE KERNEL**
+(mine is the circle arrow button on Firefox)
+**when finished** or you WILL **RUN OUT OF RESOURCES**.
 
