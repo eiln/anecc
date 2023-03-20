@@ -1,7 +1,7 @@
 
 # anecc
 
-# UNDER CONSTRUCTION
+# WIP (but works on my machine)
 
 > Run a CoreML MLModel on the Asahi Neural Engine
 
