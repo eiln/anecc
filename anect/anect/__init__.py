@@ -220,6 +220,8 @@ def anect_print(res):
 		print('\t\t.types[%d] = ANE_TILE_SRC,' % (4 + res.dst_count + n))
 	print('\t},')
 
+	print('\t.data = &_binary_%s_anec_start,' % (res.name))
+
 	for n in range(res.dst_count):
 		nchw = res.nchw[n + res.src_count]
 		print('\t.nchw[%d] = {%d, %d, %d, %d, 0x%x, 0x%x}, /* dst%d */' % 
@@ -229,7 +231,6 @@ def anect_print(res):
 		nchw = res.nchw[n]
 		print('\t.nchw[%d] = {%d, %d, %d, %d, 0x%x, 0x%x}, /* src%d */' % 
 		(4 + res.dst_count + n, nchw.N, nchw.C, nchw.H, nchw.W, nchw.pS, nchw.rS, n))
-
 	print('};')
 	print('')
 	return
@@ -244,18 +245,16 @@ def _anect_write_hdr(res, prefix=""):
 		f.write('#define __ANEC_%s_H__\n' % (res.name.upper()))
 		f.write('\n')
 		f.write('#include "ane.h"\n')
+		f.write('\n')
+		f.write('extern char _binary_%s_anec_start[];\n' % (res.name))
+		f.write('extern char _binary_%s_anec_end[];\n' % (res.name))
 
 		cap = io.StringIO()
 		with contextlib.redirect_stdout(cap):
 			anect_print(res)
 		f.write(cap.getvalue())
 
-		f.write('extern char _binary_%s_anec_start[];\n' % (res.name))
-		f.write('extern char _binary_%s_anec_end[];\n' % (res.name))
-		f.write('\n')
-		f.write('struct ane_nn *ane_init_%s(void) {\n' % res.name)
-		f.write('\treturn ane_init(&anec_%s, &_binary_%s_anec_start);\n' % (res.name, res.name))
-		f.write('}\n')
+		f.write('struct ane_nn *ane_init_%s(void) { return ane_init(&anec_%s); }\n' % (res.name, res.name))
 		f.write('\n')
 		f.write('#endif /* __ANEC_%s_H__ */\n' % (res.name.upper()))
 	return fname
