@@ -9,11 +9,6 @@
 converts and compiles an Apple CoreML MLModel
 to a Linux executable compatible with [my new driver](https://github.com/eiln/ane).
 
-Bindings are currently available for 
-[C](#c),
-[C++](#c-1),
-[Python](#python).
-
 
 # Installation
 
@@ -37,8 +32,7 @@ Verify installation with:
 	Options:
 	  -n, --name TEXT    Model name.
 	  -o, --outdir TEXT  Output directory prefix.
-	  -c, --c            Compile to C (default).
-	  -d, --cpp          Compile to C++.
+	  -c, --c            Compile to C/C++.
 	  -p, --python       Compile to Python.
 	  -a, --all          Compile to all.
 	  --help             Show this message and exit.
@@ -58,7 +52,7 @@ On MacOS you can execute a MLModel with:
 	model = ane.Model("yolov5.anec.so")
 
 
-Or the real deal, a header + object for C/C-likes:
+Or the real deal, a header + object for C/C++/C-likes:
 
 	#include "ane.h"
 	#include "anec_yolov5.h"
@@ -73,12 +67,12 @@ Or the real deal, a header + object for C/C-likes:
 		return 0;
 	}
 
-Compiled with:
+Compiles with `gcc` or `g++`:
 
-	gcc -I/usr/include/libdrm -I/usr/include/accel?/idk \
+	g++ -I/usr/include/libdrm -I/usr/include/accel?/idk \
 		-I/usr/include/libane /usr/lib/libane.o \
-		yolov5.anec.o main.c -o main.out
-
+		yolov5.anec.o anec_yolov5.o \
+		main.c -o main.out
 
 TODO. Resolve kernel driver include path.
 
@@ -113,10 +107,11 @@ Still in MacOS-land.
 I kinda lied about the MLModel part.
 When a MLModel file is loaded,
 
-	mlmodel = ct.models.MLModel("path/to/model.mlmodel")
+	mlmodel = ct.models.MLModel("mobilenet.mlmodel")
 
 the CoreML backend is called to re-compile the
-model specs into one executable on the ANE. Every. Time.
+[model specs](coreml101.md#from-builder)
+into one executable on the ANE. Every. Time.
 The compiled model is embedded in a macho suffixed "*.hwx".
 My guess for the name is "hardware executable".
 Sorry "hwx" just isn't as catchy.
@@ -159,8 +154,7 @@ Send me the mlmodel and I'll take a look at it.
 ### Step 2. anecc: Convert & Compile
 
 `anecc` first internally [converts](anect/anect/__init__.py) the hwx
-into a [data structure](https://github.com/eiln/ane/blob/main/ane/src/include/drm_ane.h)
-needed by the driver.
+into a data structure needed by the driver.
 Then, the "compilation" portion consists of miscellaneous
 `gcc/ld` commands that wrap the data structure nicely.
 
@@ -186,16 +180,12 @@ v.s. Linux:
 	anect::info: using name: mobilenet
 	anect::info: found input 1/1: (1, 3, 224, 224)
 	anect::info: found output 1/1: (1, 1, 1, 1000)
-	anect::info: writing header to /tmp/tmpo_kkogf1/anec_mobilenet.h
-	anect::info: writing binary to /tmp/tmpo_kkogf1/mobilenet.anec
 	anecc::info: ld -r -b binary -o mobilenet.anec.o mobilenet.anec
-	anecc::info: compiling for C...
-	anecc::info: created header: /home/eileen/anec_mobilenet.h
-	anecc::info: created object: /home/eileen/mobilenet.anec.o
-	anecc::info: compiling for C++...
-	anecc::info: gcc -I//usr/include/libdrm -I//home/eileen/ane/ane/src/include -I//usr/include/libane -c -o /tmp/tmpo_kkogf1/anecpp_mobilenet.o /tmp/tmpo_kkogf1/anecpp_mobilenet.c
-	anecc::info: created cpp object: /home/eileen/anecpp_mobilenet.o
-	anecc::info: created hpp header: /home/eileen/anecpp_mobilenet.hpp
+	anecc::info: compiling for C/C++...
+	anecc::info: created kernel object: /home/eileen/mobilenet.anec.o
+	anecc::info: gcc -I//usr/include/libdrm -I//home/eileen/ane/ane/src/include -I//usr/include/libane -c -o /tmp/tmpo_kkogf1/anec_mobilenet.o /tmp/tmpo_kkogf1/anec_mobilenet.c
+	anecc::info: created anec object: /home/eileen/anec_mobilenet.o
+	anecc::info: created anec header: /home/eileen/anec_mobilenet.h
 	anecc::info: compiling for Python...
 	anecc::info: gcc -shared -pthread -fPIC -fno-strict-aliasing -I. -I//usr/include/python3.10 -I//usr/include/libdrm -I//home/eileen/ane/ane/src/include -I//usr/include/libane /usr/lib/libane.o mobilenet.anec.o /tmp/tmpo_kkogf1/pyane_mobilenet.c -o /tmp/tmpo_kkogf1/mobilenet.anec.so
 	anecc::info: created dylib oject: /home/eileen/mobilenet.anec.so
@@ -212,28 +202,27 @@ Save the "mobilenet.hwx" to Linux partition.
 
 Then, in Linux,
 
-	anecc mobilenet.hwx
+	anecc mobilenet.hwx -a
 
 
 # Usage
 
-### C
+### C/C++
 
 	anecc --c yolov5.hwx
 
-Generates 
+Generates
 
-	anec_$name.h, $name.anec.o
+	anec_$name.h, anec_$name.o, $name.anec.o
 
-
-The header defines `anec_init_$name()`,
+The header `anec_$name.h` defines `ane_init_$name()`,
 which can be used as:
 
 	#include "ane.h"
 	#include "anec_yolov5.h" // anec_$name.h 
 
 	int main(void) {
-		struct ane_nn *nn = ane_init_yolov5(); // anec_init_$name()
+		struct ane_nn *nn = ane_init_yolov5(); // ane_init_$name()
 		if (nn == NULL) {
 			return -1;
 		}
@@ -242,48 +231,15 @@ which can be used as:
 		return 0;
 	}
 
-Compile with:
+Compile with `gcc` or `g++`:
 
 	gcc -I/usr/include/libdrm -I/usr/include/accel?/idk \
 		-I/usr/include/libane /usr/lib/libane.o \
-		yolov5.anec.o main.c -o main.out
+		yolov5.anec.o anec_yolov5.o \
+		main.c -o main.out
 
 See the `libane` [source](https://github.com/eiln/ane/tree/main/libane).
 TODO. Document this.
-
-
-### C++
-
-	anecc --cpp yolov5.hwx
-
-Generates 
-
-	anecpp_$name.hpp, $name.anec.o, anecpp_$name.o
-
-
-The header defines `anecpp_init_$name()`,
-which can be used as:
-
-	#include "ane.h"
-	#include "anecpp_yolov5.hpp" // anecpp_$name.hpp
-
-	int main(void) {
-		struct ane_nn *nn = anecpp_init_yolov5(); // anecpp_init_$name()
-		if (nn == NULL) {
-			return -1;
-		}
-		// ...
-		ane_free(nn);
-		return 0;
-	}
-
-Compile with:
-
-	g++ -I/usr/include/libdrm -I/usr/include/accel?/idk \
-		-I/usr/include/libane /usr/lib/libane.o \
-		yolov5.anec.o anecpp_yolov5.o main.cpp -o main.out
-
-Other `libane` functions are the same as C.
 
 
 ### Python
@@ -309,8 +265,8 @@ Load the dylib with:
 
 ### Jupyter Notebook
 
-Everything is the same as normal Python,
+Works the same as normal Python,
 but you NEED to **RESTART THE KERNEL**
-(mine is the circle arrow button on Firefox)
-**when finished** or you WILL **RUN OUT OF RESOURCES**.
-
+(circle arrow button on Firefox)
+**when finished** to trigger atexit
+else you WILL **RUN OUT OF RESOURCES**.
