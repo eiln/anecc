@@ -30,7 +30,7 @@ LIBANE_HDR = "/usr/include/libane"
 LIBANE_OBJ = "/usr/lib/libane.o"
 
 
-def anecc_compile(path, name="model", outdir="", c=True, cpp=False, python=False):
+def anecc_compile(path, name="model", outdir="", c=True, python=False):
 
 	if (platform.system() != "Linux"):
 		logger.warn("compiling is only supported on Linux.")
@@ -55,57 +55,45 @@ def anecc_compile(path, name="model", outdir="", c=True, cpp=False, python=False
 		logger.info(cmd)
 		subprocess.run(shlex.split(cmd))
 
-		if (c or cpp):
-			logger.info('compiling for C...')
+		if (c):
+			logger.info('compiling for C/C++...')
+			shutil.copyfile(anec_obj, os.path.join(outdir, anec_obj))
+			logger.info(f'created kernel object: {os.path.join(outdir, anec_obj)}')
 
-			hdr_path = os.path.join(outdir, anec_hdr)
-			obj_path = os.path.join(outdir, anec_obj)
-			if (c):
-				shutil.copyfile(anec_hdr, hdr_path)
-				logger.info(f'created header: {hdr_path}')
-			shutil.copyfile(anec_obj, obj_path)
-			logger.info(f'created object: {obj_path}')
-
-		if (cpp):
-			logger.info('compiling for C++...')
-
-			cpp_obj_name = f'anecpp_{name}.o'
-			cpp_obj = os.path.join(tmpdir, cpp_obj_name)
-
-			cpp_src = os.path.join(tmpdir, f'anecpp_{name}.c')
-			with open(cpp_src, "w") as f:
+			init_obj = os.path.join(tmpdir, f'anec_{name}.o')
+			init_src = os.path.join(tmpdir, f'anec_{name}.c')
+			with open(init_src, "w") as f:
 				f.write(f'#include "ane.h"\n')
 				f.write(f'#include "{anec_hdr}"\n')
-				f.write('struct ane_nn *anecpp_init_%s(void) { return ane_init_%s(); }\n' % (name, name))
 			cmd = f'{CC} -I/{LIBDRM_HDR}' \
 				f' -I/{DRIVER_HDR} -I/{LIBANE_HDR}' \
-				f' -c -o {cpp_obj} {cpp_src}'
+				f' -c -o {init_obj} {init_src}'
 			logger.info(cmd)
 			subprocess.run(shlex.split(cmd))
 
-			cpp_obj_path = os.path.join(outdir, cpp_obj_name)
-			shutil.copyfile(cpp_obj, cpp_obj_path)
-			logger.info(f'created cpp object: {cpp_obj_path}')
+			obj_path = os.path.join(outdir, f'anec_{name}.o')
+			shutil.copyfile(init_obj, obj_path)
+			logger.info(f'created anec object: {obj_path}')
 
-			hpp = "#ifndef __ANECPP_%s_HPP__\n" \
-				"#define __ANECPP_%s_HPP__\n" \
+			hdr = "#ifndef __ANEC_%s_H__\n" \
+				"#define __ANEC_%s_H__\n" \
 				"\n" \
 				"#if defined(__cplusplus)\n" \
 				"extern \"C\" {\n" \
 				"#endif\n" \
 				"\n" \
 				"#include \"ane.h\"\n" \
-				"struct ane_nn *anecpp_init_%s(void);\n" \
+				"struct ane_nn *ane_init_%s(void);\n" \
 				"\n" \
 				"#if defined(__cplusplus)\n" \
 				"}\n" \
 				"#endif\n" \
 				"\n" \
-				"#endif /* __ANECPP_%s_HPP__ */\n" % (name.upper(), name.upper(), name, name.upper())
-			hpp_path = os.path.join(outdir, f'anecpp_{name}.hpp')
-			with open(hpp_path, "w") as f:
-				f.write(hpp)
-			logger.info(f'created hpp header: {hpp_path}')
+				"#endif /* __ANEC_%s_H__ */\n" % (name.upper(), name.upper(), name, name.upper())
+			hdr_path = os.path.join(outdir, f'anec_{name}.h')
+			with open(hdr_path, "w") as f:
+				f.write(hdr)
+			logger.info(f'created anec header: {hdr_path}')
 
 		if (python):
 			logger.info('compiling for Python...')
