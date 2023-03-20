@@ -295,7 +295,7 @@ Generates
 	$name.anec.so
 
 
-Backend is the [ane](https://github.com/eiln/ane/tree/main/python)
+Backend is the [ane](https://github.com/eiln/ane/blob/main/python/ane/__init__.py)
 package, which can be installed with:
 
 	pip install ane
