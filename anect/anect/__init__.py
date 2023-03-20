@@ -50,7 +50,7 @@ def ntiles(size):
 def _anect_get_name(name, hwxpath):
 	if (not name):
 		name = os.path.splitext(os.path.basename(hwxpath))[0]
-	name = name.replace("-", "_").lower()
+	name = name.replace("-", "_").replace(" ", "_").lower()
 	name = re.sub('[^0-9a-zA-Z_]', '', name)  # Remove invalid characters
 	name = re.sub('^[^a-zA-Z_]+', '', name)  # Remove leading characters until we find a letter or underscore
 	if (not name):
@@ -248,7 +248,7 @@ def anect_print(res):
 def _anect_write_hdr(res, prefix=""):
 	fname = f'anec_{res.name}.h'
 	outpath = os.path.join(prefix, fname)
-	logger.info(f'writing header to {outpath}')
+	logger.debug(f'writing header to {outpath}')
 	with open(outpath, "w") as f:
 		f.write('#ifndef __ANEC_%s_H__\n' % (res.name.upper()))
 		f.write('#define __ANEC_%s_H__\n' % (res.name.upper()))
@@ -274,7 +274,7 @@ def _anect_write_hdr(res, prefix=""):
 def _anect_write_bin(res, prefix=""):
 	fname = f'{res.name}.anec'
 	outpath = os.path.join(prefix, fname)
-	logger.info(f'writing binary to {outpath}')
+	logger.debug(f'writing kernel to {outpath}')
 	open(outpath, "wb").write(res.data[res.tsk_start:res.tsk_start+res.size])
 	return fname
 

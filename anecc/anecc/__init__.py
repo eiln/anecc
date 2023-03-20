@@ -30,15 +30,16 @@ LIBANE_HDR = "/usr/include/libane"
 LIBANE_OBJ = "/usr/lib/libane.o"
 
 
-def anecc_compile(path, name="model", outdir="", c=True, python=False):
+def anecc_compile(path, name="model", outdir="", c=False, python=False):
 
 	if (platform.system() != "Linux"):
 		logger.warn("compiling is only supported on Linux.")
 	res = anect_convert(path, name=name)
-	name = res.name  # override with sanitized name
 	if (platform.system() != "Linux"):
 		logger.warn("Model can convert successfully. Re-run anecc in Linux.")
 		exit(0)
+
+	name = res.name  # override with sanitized name
 
 	if (not outdir):
 		outdir = os.getcwd()
@@ -52,7 +53,7 @@ def anecc_compile(path, name="model", outdir="", c=True, python=False):
 		anec_hdr = f'anec_{name}.h'
 		anec_obj = f'{name}.anec.o'
 		cmd = f'ld -r -b binary -o {anec_obj} {name}.anec'
-		logger.info(cmd)
+		logger.debug(cmd)
 		subprocess.run(shlex.split(cmd))
 
 		if (c):
@@ -94,6 +95,7 @@ def anecc_compile(path, name="model", outdir="", c=True, python=False):
 			with open(hdr_path, "w") as f:
 				f.write(hdr)
 			logger.info(f'created anec header: {hdr_path}')
+
 
 		if (python):
 			logger.info('compiling for Python...')
