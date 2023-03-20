@@ -1,19 +1,25 @@
 
-
 # coreml101
 
-
 	import coremltools as ct  # pip install coremltools
+
+
+Three options:
+
+1. [From pytorch](#from-pytorch) -- recommded for neural networks
+2. [From mb](#from-mb) -- recommded for compute passes
+3. [From builder](#from-builder)
 
 
 
 ## From pytorch
 
-First load a torch model as normal.
-E.g. pretrained from hub:
+First load a torch model as normal;
+e.g. pretrained from hub:
 
 	model = torch.hub.load('pytorch/vision:v0.11.0', 'fcn_resnet50', pretrained=True).eval()
 	model = torchvision.models.mobilenet_v2(pretrained=True).eval()
+
 
 or a custom torch.nn module:
 
@@ -56,7 +62,6 @@ Finally, convert:
 	mlmodel.save("model.mlmodel")
 
 
-
 Simple runnable example using pretrained weights:
 
 	import coremltools as ct
@@ -69,7 +74,6 @@ Simple runnable example using pretrained weights:
 
 	mlmodel = ct.convert(trace, inputs=[ct.TensorType(name="x", shape=input.shape)])
 	mlmodel.save("mobilenet.mlmodel")
-
 
 
 Another runnable example but with two inputs:
@@ -95,9 +99,7 @@ Another runnable example but with two inputs:
 
 
 
-
 ## From MB
-
 
 	from coremltools.converters.mil import Builder as mb
 
@@ -115,7 +117,6 @@ torch conversion comes down to resolving torch ops -> MB ops:
 MB is a convinience decorator around Builder.
 It's nice for extracting isolated compute passes, e.g.,
 
-
 	@mb.program(input_specs=[mb.TensorSpec(shape=(512, 640))])
 	def sqrt(x):
 	    x = mb.sqrt(x=x)
@@ -124,13 +125,14 @@ It's nice for extracting isolated compute passes, e.g.,
 
 Two inputs:
 
-	@mb.program(input_specs=[mb.TensorSpec(shape=(123, 456)), mb.TensorSpec(shape=(456, 789)),])
+	@mb.program(input_specs=[mb.TensorSpec(shape=(123, 456)),
+				 mb.TensorSpec(shape=(456, 789)),])
 	def matmul(x, y):
 	    x = mb.matmul(x=x, y=y)
 	    return x
 
 
-Convert with decorated function name:
+Then convert with decorated function name:
 
 	mlmodel = ct.convert(matmul)
 
@@ -140,6 +142,19 @@ To see all MB ops,
 	curl https://raw.githubusercontent.com/apple/coremltools/main/coremltools/converters/mil/backend/nn/op_mapping.py \
 		| grep "@register_mil_to_nn_mapping" -A 1 | grep "^def"
 
+
+Runnable example that does element-wise addition:
+
+	import coremltools as ct
+	from coremltools.converters.mil import Builder as mb
+
+	@mb.program(input_specs=[mb.TensorSpec(shape=(123, 456)),
+				 mb.TensorSpec(shape=(123, 456)),])
+	def add(x, y):
+	    x = mb.add(x=x, y=y)
+	    return x
+
+	mlmodel = ct.convert(add)
 
 
 P.S. if anyone with enough time and SSD 
@@ -154,7 +169,7 @@ is willing to mass convert matmul kernels do lmk.
 
 
 All the conversion methods essentially come down to building the model "spec".
-The model spec is a DAG graph of passes connected by dict keys.
+The model spec is a DAG (graph) of passes connected by dict keys.
 When ct.models.MLModel(spec) is called, the spec, formatted as an XML/plist,
 is fed into ANECompiler.
 
@@ -163,7 +178,6 @@ It's verbose as shit and really fucking anal about dict key names.
 Why passes aren't positional I don't know.
 I totally see MB being born out of this concern.
 Use MB if you can, but Builder does grant the finest control.
-
 
 	input_features = [("x", datatypes.Array(*(10, 20, 30)))]
 	output_features = [("output", None)]
@@ -175,12 +189,10 @@ Use MB if you can, but Builder does grant the finest control.
 	            input_name="x",
 	            output_name="output",
 	        )
-	cube = builder.spec
-
 
 There is no conversion
 
-	mlmodel = ct.models.MLModel(cube)
+	mlmodel = ct.models.MLModel(builder.spec)
 
 because it's the raw entrypoint to the xml IR.
 
