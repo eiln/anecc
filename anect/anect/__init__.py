@@ -199,45 +199,45 @@ def anect_convert(hwxpath, name="model", force=False):
 def anect_print(res):
 	print('')
 	print('static const struct ane_model anec_%s = {' % res.name)
-	print('        .name = "%s",' % res.name)
-	print('        .input_count = %d,' % res.src_count)
-	print('        .output_count = %d,' % res.dst_count)
+	print('\t.name = "%s",' % res.name)
+	print('\t.input_count = %d,' % res.src_count)
+	print('\t.output_count = %d,' % res.dst_count)
 
-	print('        .anec = {')
-	print('                .size = 0x%x,' % res.size)
-	print('                .td_size = 0x%x,' % res.td_size)
-	print('                .td_count = 0x%x,' % res.td_count)
-	print('                .tsk_size = 0x%x,' % res.tsk_size)
-	print('                .krn_size = 0x%x,' % res.krn_size)
+	print('\t.anec = {')
+	print('\t\t.size = 0x%x,' % res.size)
+	print('\t\t.td_size = 0x%x,' % res.td_size)
+	print('\t\t.td_count = 0x%x,' % res.td_count)
+	print('\t\t.tsk_size = 0x%x,' % res.tsk_size)
+	print('\t\t.krn_size = 0x%x,' % res.krn_size)
 
-	print('                .tiles[0] = %d, /* 0x%x */' % (ntiles(round_up(res.size, TILE_SIZE)), round_up(res.size, TILE_SIZE)))
+	print('\t\t.tiles[0] = %d, /* 0x%x */' % (ntiles(round_up(res.size, TILE_SIZE)), round_up(res.size, TILE_SIZE)))
 	for n in range(res.itm_count):
-		print('                .tiles[%d] = %d, /* itm%d 0x%x */' % 
+		print('\t\t.tiles[%d] = %d, /* itm%d 0x%x */' % 
 		      (3 + n, ntiles(res.itm_sizes[n]), n, res.itm_sizes[n]))
 	for n in range(res.dst_count):
-		print('                .tiles[%d] = %d, /* dst%d 0x%x */' % 
+		print('\t\t.tiles[%d] = %d, /* dst%d 0x%x */' % 
 		      (4 + n, ntiles(res.dst_sizes[n]), n, res.dst_sizes[n]))
 	for n in range(res.src_count):
-		print('                .tiles[%d] = %d, /* src%d 0x%x */' % 
+		print('\t\t.tiles[%d] = %d, /* src%d 0x%x */' % 
 		      (4 + res.dst_count + n, ntiles(res.src_sizes[n]), n, res.src_sizes[n]))
 
-	print('                .types[%d] = ANE_TILE_CMD,' % (0))
+	print('\t\t.types[%d] = ANE_TILE_CMD,' % (0))
 	for n in range(res.itm_count):
-		print('                .types[%d] = ANE_TILE_ITM,' % (3 + n))
+		print('\t\t.types[%d] = ANE_TILE_ITM,' % (3 + n))
 	for n in range(res.dst_count):
-		print('                .types[%d] = ANE_TILE_DST,' % (4 + n))
+		print('\t\t.types[%d] = ANE_TILE_DST,' % (4 + n))
 	for n in range(res.src_count):
-		print('                .types[%d] = ANE_TILE_SRC,' % (4 + res.dst_count + n))
-	print('        },')
+		print('\t\t.types[%d] = ANE_TILE_SRC,' % (4 + res.dst_count + n))
+	print('\t},')
 
 	for n in range(res.dst_count):
 		nchw = res.nchw[n + res.src_count]
-		print('        .nchw[%d] = {%d, %d, %d, %d, 0x%x, 0x%x}, /* dst%d */' % 
+		print('\t.nchw[%d] = {%d, %d, %d, %d, 0x%x, 0x%x}, /* dst%d */' % 
 		(4 + n, nchw.N, nchw.C, nchw.H, nchw.W, nchw.pS, nchw.rS, n))
 
 	for n in range(res.src_count):
 		nchw = res.nchw[n]
-		print('        .nchw[%d] = {%d, %d, %d, %d, 0x%x, 0x%x}, /* src%d */' % 
+		print('\t.nchw[%d] = {%d, %d, %d, %d, 0x%x, 0x%x}, /* src%d */' % 
 		(4 + res.dst_count + n, nchw.N, nchw.C, nchw.H, nchw.W, nchw.pS, nchw.rS, n))
 
 	print('};')
@@ -263,7 +263,9 @@ def _anect_write_hdr(res, prefix=""):
 		f.write('extern char _binary_%s_anec_start[];\n' % (res.name))
 		f.write('extern char _binary_%s_anec_end[];\n' % (res.name))
 		f.write('\n')
-		f.write('#define ane_init_%s() (ane_init(&anec_%s, &_binary_%s_anec_start))\n' % (res.name, res.name, res.name))
+		f.write('struct ane_nn *ane_init_%s(void) {\n' % res.name)
+		f.write('\treturn ane_init(&anec_%s, &_binary_%s_anec_start);\n' % (res.name, res.name))
+		f.write('}\n')
 		f.write('\n')
 		f.write('#endif /* __ANEC_%s_H__ */\n' % (res.name.upper()))
 	return fname
