@@ -26,25 +26,14 @@ BAR_SIZE = 0x20
 DMA0_GRAN = 16
 TD_MAGIC = 0xf401f800
 
-
 class dotdict(dict):  # https://stackoverflow.com/a/23689767/20891128
 	__getattr__ = dict.get
 	__setattr__ = dict.__setitem__
 	__delattr__ = dict.__delitem__
 
-def unpack_L(data):
-	assert ((isinstance(data, bytes)) and (not len(data) % 4))
-	return struct.unpack('<' + 'L'*(len(data) // 4), data)
-
-def round_up(x, y):
-	return ((x + (y - 1)) & (-y))
-
-def round_down(x, y):
-	return (x - (x % y))
-
-def ntiles(size):
-	assert(not (size % TILE_SIZE))
-	return (size // TILE_SIZE)
+def ntiles(size): return (size // TILE_SIZE)
+def round_up(x, y): return ((x + (y - 1)) & (-y))
+def round_down(x, y): return (x - (x % y))
 
 
 def _anect_get_name(name, hwxpath):
@@ -98,7 +87,8 @@ def anect_convert(hwxpath, name="model", force=False):
 	res.name = _anect_get_name(name, hwxpath)
 
 	res.data = open(hwxpath, "rb").read()
-	up = unpack_L(res.data)
+	assert ((isinstance(res.data, bytes)) and (not len(res.data) % 4))
+	up = struct.unpack('<' + 'L'*(len(res.data) // 4), res.data)
 
 	first = next(i for i,x in enumerate(up) if (x == BASE_ADDR))
 	pos = next(i for i,x in enumerate(up) if (x == BASE_ADDR) and (i > first))
