@@ -4,8 +4,8 @@
 # Copyright 2022 Eileen Yoon <eyn@gmx.com>
 
 import contextlib
-import subprocess
 import logging
+import string
 import struct
 import io
 import os
@@ -35,11 +35,27 @@ def ntiles(size): return (size // TILE_SIZE)
 def round_up(x, y): return ((x + (y - 1)) & (-y))
 def round_down(x, y): return (x - (x % y))
 
+# https://stackoverflow.com/a/17197027
+def strings(filename, min_len=4):
+	with open(filename, errors="ignore") as f:
+		data = f.read()
+		result = ""
+		for c in data:
+			if c in string.printable:
+				result += c
+				continue
+			if len(result) >= min_len:
+				yield result
+			result = ""
+		if len(result) >= min_len:  # catch result at EOF
+			yield result
 
-def _anect_get_name(name, hwxpath):
+
+def _anect_get_name(hwxpath, name):
 	if (not name):
 		name = os.path.splitext(os.path.basename(hwxpath))[0]
 	name = name.replace("-", "_").replace(" ", "_").lower()
+	# https://stackoverflow.com/a/3303361
 	name = re.sub('[^0-9a-zA-Z_]', '', name)  # Remove invalid characters
 	name = re.sub('^[^a-zA-Z_]+', '', name)  # Remove leading characters until we find a letter or underscore
 	if (not name):
@@ -49,7 +65,10 @@ def _anect_get_name(name, hwxpath):
 
 
 def _anect_get_nchw(hwxpath):
-	stabs = subprocess.Popen(['sh', '-c', 'strings -n 50 "%s" | grep "ar1" | grep ":t.*:5$"' % (hwxpath)], stdout=subprocess.PIPE).communicate()[0].decode().split()
+	# strings -n 50 "model.hwx" | grep ":t.*:5$"
+	lines = list(strings(hwxpath, min_len=50))
+	regexp = re.compile(":t.*:5$")
+	stabs = [line for line in lines if re.search(regexp, line)]
 	assert(len(stabs) >= 2)
 
 	nchw_l = []
@@ -84,10 +103,10 @@ def anect_convert(hwxpath, name="model", force=False):
 		logger.warn("pass the hwx output of coreml2hwx")
 
 	res = dotdict({"path": hwxpath})
-	res.name = _anect_get_name(name, hwxpath)
+	res.name = _anect_get_name(hwxpath, name)
 
 	res.data = open(hwxpath, "rb").read()
-	assert ((isinstance(res.data, bytes)) and (not len(res.data) % 4))
+	assert ((not len(res.data) % 4))
 	up = struct.unpack('<' + 'L'*(len(res.data) // 4), res.data)
 
 	first = next(i for i,x in enumerate(up) if (x == BASE_ADDR))
@@ -117,9 +136,9 @@ def anect_convert(hwxpath, name="model", force=False):
 	itm_count = 0
 	src_count = 0
 	dst_count = 0
-	res["itm_sizes"] = [0] * BAR_SIZE
-	res["src_sizes"] = [0] * BAR_SIZE
-	res["dst_sizes"] = [0] * BAR_SIZE
+	res.itm_sizes = [0] * BAR_SIZE
+	res.src_sizes = [0] * BAR_SIZE
+	res.dst_sizes = [0] * BAR_SIZE
 	for n in range(BAR_SIZE):
 		try:
 			pos = next(i for i,x in enumerate(up) if (x == buf_addr))
@@ -132,17 +151,17 @@ def anect_convert(hwxpath, name="model", force=False):
 		ident = up[pos+8:pos+12]
 		if (ident == (0x3, 0x3, 0x1, 0x4)):
 			buf_name = "itm%d" % itm_count
-			res["itm_sizes"][itm_count] = buf_size
+			res.itm_sizes[itm_count] = buf_size
 			itm_count += 1
 
 		elif (ident == (0x1, 0x1, 0x1, 0x6)):
 			buf_name = "src%d" % src_count
-			res["src_sizes"][src_count] = buf_size
+			res.src_sizes[src_count] = buf_size
 			src_count += 1
 
 		elif (ident == (0x2, 0x2, 0x1, 0x6)):
 			buf_name = "dst%d" % dst_count
-			res["dst_sizes"][dst_count] = buf_size
+			res.dst_sizes[dst_count] = buf_size
 			dst_count += 1
 
 		else:
@@ -154,6 +173,7 @@ def anect_convert(hwxpath, name="model", force=False):
 	assert((src_count) and (dst_count) and (itm_count <= 1))
 	res.update({"itm_count": itm_count, "src_count": src_count,  "dst_count": dst_count})
 
+
 	rnge = [i for i,x in enumerate(up) if (x == TD_MAGIC)]
 	assert(len(rnge) == td_count)
 	low, high = min(rnge), max(rnge)
@@ -162,7 +182,7 @@ def anect_convert(hwxpath, name="model", force=False):
 	res.update({"tsk_start": tsk_start})
 
 
-	res["nchw"] = _anect_get_nchw(hwxpath)
+	res.nchw = _anect_get_nchw(hwxpath)
 	assert(len(res.nchw) == (src_count + dst_count))
 	for n in range(src_count):
 		nchw = res.nchw[n]
@@ -182,7 +202,7 @@ def anect_convert(hwxpath, name="model", force=False):
 				logger.warn("bypassing suspected CPU layer warning")
 			else:
 				raise RuntimeError("uh oh, looks like there's an unresolved CPU layer.\n"
-						"              did you really mean %d inputs? use the -f flag to bypass this." % (res.src_count))
+						"did you really mean %d inputs? use the -f flag to bypass this." % (res.src_count))
 	return res
 
 
