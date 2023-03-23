@@ -30,7 +30,7 @@ LIBANE_HDR = "/usr/include/libane"
 LIBANE_OBJ = "/usr/lib/libane.o"  # python doesn't like archives
 
 
-def _anecc_compile_c(name, outdir, tmpdir):
+def _anecc_compile_c(name, outdir, tmpdir, flags=""):
 
 	logger.info('compiling for C/C++...')
 
@@ -46,7 +46,7 @@ def _anecc_compile_c(name, outdir, tmpdir):
 		f.write(f'#include "ane.h"\n')
 		f.write(f'#include "anec_{name}.h"\n')
 
-	cmd = f'{CC} {CFLAGS} -I/{DRIVER_HDR} -I/{LIBANE_HDR}' \
+	cmd = f'{CC} {CFLAGS} {flags} -I/{DRIVER_HDR} -I/{LIBANE_HDR}' \
 		f' -c -o {init_obj} {init_src}'
 	logger.info(cmd)
 	subprocess.run(shlex.split(cmd))
@@ -79,7 +79,7 @@ def _anecc_compile_c(name, outdir, tmpdir):
 	return
 
 
-def _anecc_compile_python(name, outdir, tmpdir):
+def _anecc_compile_python(name, outdir, tmpdir, flags=""):
 
 	logger.info('compiling for Python...')
 
@@ -93,7 +93,7 @@ def _anecc_compile_python(name, outdir, tmpdir):
 		f.write('void *pyane_init(void) { return ane_init_%s(); }\n' % name)
 
 	# compile completed dylib
-	cmd = f'{CC} {CFLAGS} -shared -pthread -fPIC -fno-strict-aliasing' \
+	cmd = f'{CC} {CFLAGS} {flags} -shared -pthread -fPIC -fno-strict-aliasing' \
 		f' -I/{PYTHON_HDR} -I/{DRIVER_HDR} -I/{LIBANE_HDR}' \
 		f' {LIBANE_OBJ} {name}.anec.o' \
 		f' {dylib_src} -o {dylib_obj}'
@@ -108,7 +108,7 @@ def _anecc_compile_python(name, outdir, tmpdir):
 	return
 
 
-def anecc_compile(path, name="model", outdir="", c=False, python=False):
+def anecc_compile(path, name="model", outdir="", flags="", c=False, python=False):
 
 	if (platform.system() != "Linux"):
 		logger.warn("compiling is only supported on Linux.")
@@ -125,6 +125,9 @@ def anecc_compile(path, name="model", outdir="", c=False, python=False):
 	name = res.name  # override with sanitized name
 	outdir = os.path.abspath(outdir)
 
+	if (flags):
+		logger.info(f'Adding flags: {flags}')
+
 	with tempfile.TemporaryDirectory() as tmpdir:
 		anect_write(res, prefix=tmpdir)
 		os.chdir(tmpdir)
@@ -138,6 +141,6 @@ def anecc_compile(path, name="model", outdir="", c=False, python=False):
 		subprocess.run(shlex.split(cmd))
 
 		if (c):
-			_anecc_compile_c(name, outdir, tmpdir)
+			_anecc_compile_c(name, outdir, tmpdir, flags=flags)
 		if (python):
-			_anecc_compile_python(name, outdir, tmpdir)
+			_anecc_compile_python(name, outdir, tmpdir, flags=flags)
