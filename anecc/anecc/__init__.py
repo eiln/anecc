@@ -24,7 +24,6 @@ logger = logging.getLogger(__name__)
 
 CC = "gcc"
 PYTHON_HDR = sysconfig.get_paths()['include']  # "/usr/include/python3.10"
-LIBDRM_HDR = "/usr/include/libdrm"
 DRIVER_HDR = "/home/eileen/ane/ane/src/include"  # should be resolved w/ accel?
 LIBANE_HDR = "/usr/include/libane"
 LIBANE_OBJ = "/usr/lib/libane.o"  # python doesn't like archives
@@ -46,8 +45,7 @@ def _anecc_compile_c(name, outdir, tmpdir):
 		f.write(f'#include "ane.h"\n')
 		f.write(f'#include "anec_{name}.h"\n')
 
-	cmd = f'{CC} -I/{LIBDRM_HDR}' \
-		f' -I/{DRIVER_HDR} -I/{LIBANE_HDR}' \
+	cmd = f'{CC} -I/{DRIVER_HDR} -I/{LIBANE_HDR}' \
 		f' -c -o {init_obj} {init_src}'
 	logger.info(cmd)
 	subprocess.run(shlex.split(cmd))
@@ -94,9 +92,8 @@ def _anecc_compile_python(name, outdir, tmpdir):
 		f.write('void *pyane_init(void) { return ane_init_%s(); }\n' % name)
 
 	# compile completed dylib
-	cmd = f'{CC} -shared -pthread -fPIC -fno-strict-aliasing -I.' \
-		f' -I/{PYTHON_HDR} -I/{LIBDRM_HDR}' \
-		f' -I/{DRIVER_HDR} -I/{LIBANE_HDR}' \
+	cmd = f'{CC} -shared -pthread -fPIC -fno-strict-aliasing' \
+		f' -I. -I/{PYTHON_HDR} -I/{DRIVER_HDR} -I/{LIBANE_HDR}' \
 		f' {LIBANE_OBJ} {name}.anec.o' \
 		f' {dylib_src} -o {dylib_obj}'
 	logger.info(cmd)
