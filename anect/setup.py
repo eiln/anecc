@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(
     name="anect",
-    version="1.0.7",
+    version="1.0.8",
     description='ANE converter',
     author='Eileen Yoon',
     author_email='eyn@gmx.com',
