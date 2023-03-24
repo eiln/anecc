@@ -174,6 +174,15 @@ def anect_convert(hwxpath, name="model", force=False):
 	res.update({"itm_count": itm_count, "src_count": src_count,  "dst_count": dst_count})
 
 
+	res.tiles = [0x0] * BAR_SIZE
+	for n in range(res.itm_count):
+		res.tiles[3 + n] = ntiles(res.itm_sizes[n])
+	for n in range(res.dst_count):
+		res.tiles[4 + n] = ntiles(res.dst_sizes[n])
+	for n in range(res.src_count):
+		res.tiles[4 + res.dst_count + n] = ntiles(res.src_sizes[n])
+
+
 	rnge = [i for i,x in enumerate(up) if (x == TD_MAGIC)]
 	assert(len(rnge) == td_count)
 	low, high = min(rnge), max(rnge)
@@ -223,13 +232,13 @@ def anect_print(res):
 	print('\t\t.tiles[0] = %d, /* 0x%x */' % (ntiles(round_up(res.size, TILE_SIZE)), round_up(res.size, TILE_SIZE)))
 	for n in range(res.itm_count):
 		print('\t\t.tiles[%d] = %d, /* itm%d 0x%x */' % 
-		      (3 + n, ntiles(res.itm_sizes[n]), n, res.itm_sizes[n]))
+		      (3 + n, res.tiles[3 + n], n, res.itm_sizes[n]))
 	for n in range(res.dst_count):
 		print('\t\t.tiles[%d] = %d, /* dst%d 0x%x */' % 
-		      (4 + n, ntiles(res.dst_sizes[n]), n, res.dst_sizes[n]))
+		      (4 + n, res.tiles[4 + n], n, res.dst_sizes[n]))
 	for n in range(res.src_count):
 		print('\t\t.tiles[%d] = %d, /* src%d 0x%x */' % 
-		      (4 + res.dst_count + n, ntiles(res.src_sizes[n]), n, res.src_sizes[n]))
+		      (4 + res.dst_count + n, res.tiles[4 + res.dst_count + n], n, res.src_sizes[n]))
 
 	print('\t\t.types[%d] = ANE_TILE_CMD,' % (0))
 	for n in range(res.itm_count):
