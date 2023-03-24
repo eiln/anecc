@@ -27,7 +27,7 @@ CFLAGS = "-I. -std=gnu99"
 PYTHON_HDR = sysconfig.get_paths()['include']  # "/usr/include/python3.10"
 DRIVER_HDR = "/home/eileen/ane/ane/src/include"  # should be resolved w/ accel?
 LIBANE_HDR = "/usr/include/libane"
-LIBANE_OBJ = "/usr/lib/libane.o"  # python doesn't like archives
+LIBANE_LIB = "/usr/lib/libane.a"
 
 
 def _anecc_compile_c(name, outdir, tmpdir, flags=""):
@@ -95,8 +95,9 @@ def _anecc_compile_python(name, outdir, tmpdir, flags=""):
 	# compile completed dylib
 	cmd = f'{CC} {CFLAGS} {flags} -shared -pthread -fPIC -fno-strict-aliasing' \
 		f' -I/{PYTHON_HDR} -I/{DRIVER_HDR} -I/{LIBANE_HDR}' \
-		f' {LIBANE_OBJ} {name}.anec.o' \
-		f' {dylib_src} -o {dylib_obj}'
+		f' {name}.anec.o {dylib_src} -o {dylib_obj}' \
+		f' {LIBANE_LIB}'
+
 	logger.info(cmd)
 	subprocess.run(shlex.split(cmd))
 
