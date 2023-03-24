@@ -69,10 +69,9 @@ Or the real deal, a header + object for C/C++/C-likes:
 
 Compiles with `gcc` or `g++`:
 
-	g++ -I/usr/include/libdrm -I/usr/include/accel?/idk \
-		-I/usr/include/libane /usr/lib/libane.o \
+	g++ -I/usr/include/accel?/idk -I/usr/include/libane \
 		yolov5.anec.o anec_yolov5.o \
-		main.c -o main.out
+		main.c -o main.out -lane
 
 TODO. Resolve kernel driver include path.
 
