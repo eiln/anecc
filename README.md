@@ -32,6 +32,7 @@ Verify installation with:
 	Options:
 	  -n, --name TEXT    Model name.
 	  -o, --outdir TEXT  Output directory prefix.
+	  -f, --flags TEXT   Additional compiler flags.
 	  -c, --c            Compile to C/C++.
 	  -p, --python       Compile to Python.
 	  -a, --all          Compile to all.
