@@ -193,17 +193,23 @@ def anect_convert(hwxpath, name="model", force=False):
 
 	res.nchw = _anect_get_nchw(hwxpath)
 	assert(len(res.nchw) == (src_count + dst_count))
-	for n in range(src_count):
-		nchw = res.nchw[n]
-		size = nchw.N * nchw.C * nchw.pS
-		assert(round_up(size, TILE_SIZE) == res.src_sizes[n])
-		logger.info("found input %d/%d: (%d, %d, %d, %d)" % (n+1, res.src_count, nchw.N, nchw.C, nchw.H, nchw.W))
 
-	for n in range(dst_count):
-		nchw = res.nchw[n + src_count]
-		size = nchw.N * nchw.C * nchw.pS
-		assert(round_up(size, TILE_SIZE) == res.dst_sizes[n])
-		logger.info("found output %d/%d: (%d, %d, %d, %d)" % (n+1, res.dst_count, nchw.N, nchw.C, nchw.H, nchw.W))
+	for i in range(2):
+		try:
+			for n in range(src_count):
+				nchw = res.nchw[n]
+				size = nchw.N * nchw.C * nchw.pS
+				assert(round_up(size, TILE_SIZE) == res.src_sizes[n])
+				logger.info("found input %d/%d: (%d, %d, %d, %d)" % (n+1, res.src_count, nchw.N, nchw.C, nchw.H, nchw.W))
+
+			for n in range(dst_count):
+				nchw = res.nchw[n + src_count]
+				size = nchw.N * nchw.C * nchw.pS
+				assert(round_up(size, TILE_SIZE) == res.dst_sizes[n])
+				logger.info("found output %d/%d: (%d, %d, %d, %d)" % (n+1, res.dst_count, nchw.N, nchw.C, nchw.H, nchw.W))
+
+		except: # on M2 stab order seems to be swapped
+			res.nchw = res.nchw[dst_count:] + res.nchw[:dst_count]
 
 	for stab in res.nchw:
 		if ("ctx_" in stab.name and (res.src_count > 1)):
