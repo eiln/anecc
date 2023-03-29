@@ -70,13 +70,11 @@ Or the real deal, a header + object for C/C++/C-likes:
 
 Compiles with `gcc` or `g++`:
 
-	g++ -I/usr/include/accel?/idk -I/usr/include/libane \
+	g++ -I/usr/include/libane \
 		yolov5.anec.o anec_yolov5.o \
-		main.c -o main.out -lane
+		main.c -o main -lane
 
-TODO. Resolve kernel driver include path.
-
-For details, see [Usage](#usage).
+For details, see [libane.md](https://github.com/eiln/ane/blob/main/libane.md).
 
 
 
@@ -86,7 +84,7 @@ To create or convert your own MLModel,
 you need to start in MacOS, where a CoreML runtime is available.
 
 You don't need MacOS to run a pre-converted model.
-For that, see [Usage](#usage).
+For that, again, see [libane.md](https://github.com/eiln/ane/blob/main/libane.md).
 
 [TLDR](#tldr) below.
 
