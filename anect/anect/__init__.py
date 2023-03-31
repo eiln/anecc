@@ -207,7 +207,7 @@ def anect_convert(hwxpath, name="model", force=False):
 				size = nchw.N * nchw.C * nchw.pS
 				assert(round_up(size, TILE_SIZE) == res.dst_sizes[n])
 				logger.info("found output %d/%d: (%d, %d, %d, %d)" % (n+1, res.dst_count, nchw.N, nchw.C, nchw.H, nchw.W))
-
+			break
 		except: # on M2 stab order seems to be swapped
 			res.nchw = res.nchw[dst_count:] + res.nchw[:dst_count]
 
