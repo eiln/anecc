@@ -70,9 +70,7 @@ Or the real deal, a header + object for C/C++/C-likes:
 
 Compiles with `gcc` or `g++`:
 
-	g++ -I/usr/include/libane \
-		yolov5.anec.o anec_yolov5.o \
-		main.c -o main -lane
+	g++ -I/usr/include/libane yolov5.anec.o main.c -o main -lane
 
 For details, see [libane.md](https://github.com/eiln/ane/blob/main/libane.md).
 
@@ -167,13 +165,12 @@ v.s. Linux:
 	anect::info: found output 1/1: (1, 1, 1, 1000)
 	anecc::info: ld -r -b binary -o mobilenet.anec.o mobilenet.anec
 	anecc::info: compiling for C/C++...
-	anecc::info: created kernel object: /home/eileen/mobilenet.anec.o
-	anecc::info: gcc -I//usr/include/libdrm -I//home/eileen/ane/ane/src/include -I//usr/include/libane -c -o /tmp/tmpo_kkogf1/anec_mobilenet.o /tmp/tmpo_kkogf1/anec_mobilenet.c
-	anecc::info: created anec object: /home/eileen/anec_mobilenet.o
-	anecc::info: created anec header: /home/eileen/anec_mobilenet.h
+	anecc::info: gcc -I. -std=gnu99  -I//usr/include/libane -c -o /tmp/tmpffcgxefw/anec_mobilenet.o /tmp/tmpffcgxefw/anec_mobilenet.c
+	anecc::info: created object: /home/eileen/mobilenet.anec.o
+	anecc::info: created header: /home/eileen/anec_mobilenet.h
 	anecc::info: compiling for Python...
-	anecc::info: gcc -shared -pthread -fPIC -fno-strict-aliasing -I. -I//usr/include/python3.10 -I//usr/include/libdrm -I//home/eileen/ane/ane/src/include -I//usr/include/libane /usr/lib/libane.o mobilenet.anec.o /tmp/tmpo_kkogf1/pyane_mobilenet.c -o /tmp/tmpo_kkogf1/mobilenet.anec.so
-	anecc::info: created dylib oject: /home/eileen/mobilenet.anec.so
+	anecc::info: gcc -I. -std=gnu99  -shared -pthread -fPIC -fno-strict-aliasing -I//usr/include/python3.10 -I//usr/include/libane mobilenet.krn.o /tmp/tmpffcgxefw/pyane_mobilenet.c -o /tmp/tmpffcgxefw/mobilenet.anec.so /usr/lib/libane.a
+	anecc::info: created dylib: /home/eileen/mobilenet.anec.so
 
 
 ## TLDR
