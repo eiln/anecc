@@ -33,10 +33,6 @@ def _anecc_compile_c(name, outdir, tmpdir, flags=""):
 
 	logger.info('compiling for C/C++...')
 
-	kern_obj = f'{name}.anec.o'
-	shutil.copyfile(kern_obj, os.path.join(outdir, kern_obj))
-	logger.info(f'created kernel object: {os.path.join(outdir, kern_obj)}')
-
 	# all but the init call is model-specific (duh)
 	# so compile that & generate a header for it
 	init_obj = os.path.join(tmpdir, f'anec_{name}.o')
@@ -50,9 +46,15 @@ def _anecc_compile_c(name, outdir, tmpdir, flags=""):
 	logger.info(cmd)
 	subprocess.run(shlex.split(cmd))
 
-	obj_path = os.path.join(outdir, f'anec_{name}.o')
-	shutil.copyfile(init_obj, obj_path)
-	logger.info(f'created anec object: {obj_path}')
+	# combine weights + init call into single object 
+	obj_name = f'{name}.anec.o'
+	cmd = f'ld -r {name}.krn.o anec_{name}.o -o {obj_name}'
+	logger.debug(cmd)
+	subprocess.run(shlex.split(cmd))
+
+	obj_path = os.path.join(outdir, obj_name)
+	shutil.copyfile(obj_name, obj_path)
+	logger.info(f'created object: {obj_path}')
 
 	hdr = "#ifndef __ANEC_%s_H__\n" \
 		"#define __ANEC_%s_H__\n" \
@@ -73,7 +75,7 @@ def _anecc_compile_c(name, outdir, tmpdir, flags=""):
 	hdr_path = os.path.join(outdir, f'anec_{name}.h')
 	with open(hdr_path, "w") as f:
 		f.write(hdr)
-	logger.info(f'created anec header: {hdr_path}')
+	logger.info(f'created header: {hdr_path}')
 
 	return
 
@@ -94,7 +96,7 @@ def _anecc_compile_python(name, outdir, tmpdir, flags=""):
 	# compile completed dylib
 	cmd = f'{CC} {CFLAGS} {flags} -shared -pthread -fPIC -fno-strict-aliasing' \
 		f' -I/{PYTHON_HDR} -I/{LIBANE_HDR}' \
-		f' {name}.anec.o {dylib_src} -o {dylib_obj}' \
+		f' {name}.krn.o {dylib_src} -o {dylib_obj}' \
 		f' {LIBANE_LIB}'
 
 	logger.info(cmd)
@@ -136,7 +138,7 @@ def anecc_compile(path, name="model", outdir="", flags="", c=False, python=False
 		# https://stackoverflow.com/a/4158997
 		# Since ML weights are fucking massive,
 		# we abuse ld to load them @ compile time.
-		cmd = f'ld -r -b binary -o {name}.anec.o {name}.anec'
+		cmd = f'ld -r -b binary -o {name}.krn.o {name}.anec'
 		logger.debug(cmd)
 		subprocess.run(shlex.split(cmd))
 
