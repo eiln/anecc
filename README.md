@@ -89,7 +89,7 @@ For that, again, see [libane.md](https://github.com/eiln/ane/blob/main/libane.md
 [TLDR](#tldr) below.
 
 
-### Step 0. Obtain MLModel
+## Step 0. Obtain MLModel
 
 Starting in MacOS-land.
 You should have a "*.mlmodel" file ready.
@@ -97,7 +97,7 @@ See [coreml101.md](coreml101.md).
 I'm continuing "mobilenet.mlmodel" from the torch example.
 
 
-### Step 1. coreml2hwx: MLModel -> hwx
+## Step 1. `tohwx`: Compile MLModel -> hwx
 
 
 Still in MacOS-land.
@@ -114,42 +114,29 @@ The compiled model is embedded in a macho suffixed "*.hwx".
 My guess for the name is "hardware executable".
 Sorry "hwx" just isn't as catchy.
 
-Obtain the hwx **under MacOS** using 
-[freedomtan's](https://github.com/freedomtan/coreml_to_ane_hwx) `coreml2hwx`
-conversion script, which can be installed with:
+Obtain the hwx **under MacOS** using `tohwx`, a slimmed down version of [freedomtan's](https://github.com/freedomtan/coreml_to_ane_hwx) conversion script. Install `tohwx` with:
 
-	git clone https://github.com/eiln/coreml_to_ane_hwx
-	cd coreml_to_ane_hwx
-	make install
+	git clone https://github.com/eiln/anecc.git
+	cd anecc
+	make -C tohwx
+	make -C tohwx install
 
-Use `coreml2hwx` to convert mlmodel -> hwx:
+Use `tohwx` to convert mlmodel -> hwx:
 
-	$ coreml2hwx mobilenet.mlmodel 
-	2023-02-15 10:45:59.466 coreml2hwx[986:9634] original mlmodel file: file:///Users/eileen/mobilenet.mlmodel 
-	2023-02-15 10:45:59.602 coreml2hwx[986:9634] espresso model in mlmodelc directory: /var/folders/wl/v5_h4f8x7ddc0cr8cpzb0clm0000gn/T/mobilenet.mlmodelc/model.espresso.net 
-	2023-02-15 10:45:59.902 coreml2hwx[986:9634] options:
-	{
-	    InputNetworks =     (
-	                {
-	            NetworkPlistName = "net.plist";
-	            NetworkPlistPath = "/tmp/espresso_ir_dump/";
-	        }
-	    );
-	    OutputFileName = "model.hwx";
-	    OutputFilePath = "/tmp/hwx_output/mobilenet/";
-	}
-	2023-02-15 10:45:59.902 coreml2hwx[986:9634] result at /tmp/hwx_output/mobilenet/model.hwx
+	$ tohwx mobilenet.mlmodel
+	tohwx: input mlmodel: /Users/eileen/mobilenet.mlmodel
+	tohwx: output hwx: /Users/eileen/mobilenet.hwx
+
+If it fails, it's usually because of CPU layers, which I can't do anything about. Make a pull, attach the mlmodel, and I'll take a look at it.
+
+You can also call `tohwx` in Python:
+
+	import subprocess
+	mlmodel.save("mobilenet.mlmodel")
+	subprocess.run(["tohwx", "mobilenet.mlmodel"])
 
 
-On success should print the hwx path:
-
-	cp /tmp/hwx_output/mobilenet/model.hwx mobilenet.hwx
-
-If it doesn't, sorry, I don't know.
-Send me the mlmodel and I'll take a look at it.
-
-
-### Step 2. anecc: Convert & Compile
+## Step 2. `anecc`: Convert & Compile
 
 `anecc` first internally [converts](anect/anect/__init__.py) the hwx
 into a data structure needed by the driver.
@@ -193,10 +180,9 @@ v.s. Linux:
 
 In MacOS,
 
-	coreml2hwx mobilenet.mlmodel
-	cp /tmp/hwx_output/mobilenet/model.hwx mobilenet.hwx
+	tohwx mobilenet.mlmodel
 
-Save the "mobilenet.hwx" to Linux partition. 
+Save the resulting "mobilenet.hwx" to Linux partition.
 
 Then, in Linux,
 
