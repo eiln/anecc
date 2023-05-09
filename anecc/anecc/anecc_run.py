@@ -13,8 +13,8 @@ from anecc import anecc_compile
 @click.option('--flags', '-f', type=str, default='', help="Additional compiler flags.")
 @click.option('--c', '-c', is_flag=True, default=False, help="Compile to C/C++.")
 @click.option('--python', '-p', is_flag=True, default=False, help="Compile to Python.")
+@click.option('--rust', '-r', is_flag=True, default=False, help="Compile to Rust.")
 @click.option('--all', '-a', 'all_', is_flag=True, default=False, help="Compile to all.")
-def run(path, name, outdir, flags, c, python, all_):
-	c = c or all_
-	python = python or all_
-	anecc_compile(path, name=name, outdir=outdir, flags=flags, c=c, python=python)
+def run(path, name, outdir, flags, c, python, rust, all_):
+	anecc_compile(path, name=name, outdir=outdir, flags=flags, 
+			c=c, python=python, rust=rust, all_=all_)

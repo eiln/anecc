@@ -77,7 +77,47 @@ def _anecc_compile_c(name, outdir, tmpdir, flags=""):
 		f.write(hdr)
 	logger.info(f'created header: {hdr_path}')
 
-	return
+
+def _anecc_compile_rust(name, outdir, tmpdir, flags=""):
+
+	logger.info('compiling for C/C++...')
+
+	# all but the init call is model-specific (duh)
+	# so compile that & generate a header for it
+	init_obj = os.path.join(tmpdir, f'anec_{name}.o')
+	init_src = os.path.join(tmpdir, f'anec_{name}.c')  # tmp
+	with open(init_src, "w") as f:
+		f.write(f'#include "ane.h"\n')
+		f.write(f'#include "anec_{name}.h"\n')
+
+	cmd = f'{CC} {CFLAGS} {flags} -I/{LIBANE_HDR}' \
+		f' -c -o {init_obj} {init_src}'
+	logger.info(cmd)
+	subprocess.run(shlex.split(cmd))
+
+	# combine weights + init call into single object 
+	obj_name = f'{name}.anec.o'
+	cmd = f'ld -r {name}.krn.o anec_{name}.o -o {obj_name}'
+	logger.debug(cmd)
+	subprocess.run(shlex.split(cmd))
+
+	# save into archive for rust
+	arx_name = f'libanec_{name}.a'
+	cmd = f'ar rcs {arx_name} {obj_name}'
+	logger.debug(cmd)
+	subprocess.run(shlex.split(cmd))
+
+	arx_path = os.path.join(outdir, arx_name)
+	shutil.copyfile(arx_name, arx_path)
+	logger.info(f'created archive: {arx_path}')
+
+	hdr_path = os.path.join(outdir, f'anec_{name}.rs')
+	with open(hdr_path, "w") as f:
+		f.write(f'#[link(name = "anec_{name}")]\n')
+		f.write('extern "C" {\n')
+		f.write(f'\tpub fn ane_init_{name}() -> *mut ane_nn;\n')
+		f.write('}\n')
+	logger.info(f'created header: {hdr_path}')
 
 
 def _anecc_compile_python(name, outdir, tmpdir, flags=""):
@@ -107,10 +147,9 @@ def _anecc_compile_python(name, outdir, tmpdir, flags=""):
 	shutil.copyfile(dylib_obj, dylib_path)
 	logger.info(f'created dylib: {dylib_path}')
 
-	return
 
-
-def anecc_compile(path, name="model", outdir="", flags="", c=False, python=False):
+def anecc_compile(path, name="model", outdir="", flags="",
+			c=False, python=False, rust=False, all_=False):
 
 	if (platform.system() != "Linux"):
 		logger.warn("compiling is only supported on Linux.")
@@ -120,7 +159,11 @@ def anecc_compile(path, name="model", outdir="", flags="", c=False, python=False
 	if (platform.system() != "Linux"):
 		logger.warn("Model can convert successfully. Re-run anecc in Linux.")
 		return
-	if not (c or python):
+
+	c = c or all_
+	python = python or all_
+	rust = rust or all_
+	if not (c or python or rust):
 		logger.warn("Nothing to compile. See anecc --help for available options.")
 		return
 
@@ -146,3 +189,5 @@ def anecc_compile(path, name="model", outdir="", flags="", c=False, python=False
 			_anecc_compile_c(name, outdir, tmpdir, flags=flags)
 		if (python):
 			_anecc_compile_python(name, outdir, tmpdir, flags=flags)
+		if (rust):
+			_anecc_compile_rust(name, outdir, tmpdir, flags=flags)
