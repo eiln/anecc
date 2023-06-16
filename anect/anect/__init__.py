@@ -54,7 +54,7 @@ def strings(filename, min_len=4):
 def _anect_get_name(hwxpath, name):
 	if (not name):
 		name = os.path.splitext(os.path.basename(hwxpath))[0]
-	name = name.replace("-", "_").replace(" ", "_").lower()
+	name = name.replace("-", "_").replace(" ", "_").replace(".", "_").lower()
 	# https://stackoverflow.com/a/3303361
 	name = re.sub('[^0-9a-zA-Z_]', '', name)  # Remove invalid characters
 	name = re.sub('^[^a-zA-Z_]+', '', name)  # Remove leading characters until we find a letter or underscore
