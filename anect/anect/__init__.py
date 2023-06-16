@@ -290,6 +290,7 @@ def _anect_write_hdr(res, prefix=""):
 		f.write(cap.getvalue())
 
 		f.write('struct ane_nn *ane_init_%s(void) { return ane_init(&anec_%s); }\n' % (res.name, res.name))
+		f.write('struct ane_nn *__ane_init_%s(int dev_id) { return __ane_init(&anec_%s, dev_id); }\n' % (res.name, res.name))
 		f.write('\n')
 		f.write('#endif /* __ANEC_%s_H__ */\n' % (res.name.upper()))
 	return fname

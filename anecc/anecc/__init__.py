@@ -131,7 +131,7 @@ def _anecc_compile_python(name, outdir, tmpdir, flags=""):
 	with open(dylib_src, "w") as f:
 		f.write(f'#include "pyane.h"\n')
 		f.write(f'#include "anec_{name}.h"\n')
-		f.write('void *pyane_init(void) { return ane_init_%s(); }\n' % name)
+		f.write('void *pyane_init(int dev_id) { return __ane_init_%s(dev_id); }\n' % name)
 
 	# compile completed dylib
 	cmd = f'{CC} {CFLAGS} {flags} -shared -pthread -fPIC -fno-strict-aliasing' \
