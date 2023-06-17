@@ -35,6 +35,25 @@ def ntiles(size): return (size // TILE_SIZE)
 def round_up(x, y): return ((x + (y - 1)) & (-y))
 def round_down(x, y): return (x - (x % y))
 
+import construct
+from construct import Struct, Array, Int32ul, Int64ul
+
+TILE_COUNT = 0x20
+NCHW_COUNT = 0x6
+HEADER_SIZE = 0x1000
+
+my_format = Struct(
+    "size" / Int64ul,
+    "td_size" / Int32ul,
+    "td_count" / Int32ul,
+    "tsk_size" / Int64ul,
+    "krn_size" / Int64ul,
+    "src_count" / Int32ul,
+    "dst_count" / Int32ul,
+    "tiles" / Array(TILE_COUNT, Int32ul),
+    "nchw" / Array(TILE_COUNT * NCHW_COUNT, Int64ul),
+)
+
 # https://stackoverflow.com/a/17197027
 def strings(filename, min_len=4):
 	with open(filename, errors="ignore") as f:
@@ -218,92 +237,81 @@ def anect_convert(hwxpath, name="model", force=False):
 			else:
 				raise RuntimeError("uh oh, looks like there's an unresolved CPU layer.\n"
 						"did you really mean %d inputs? use the -f flag to bypass this." % (res.src_count))
+	
+	res.build = _anect_build(res)
+
 	return res
+
+
+def _anect_build(res):
+	my_dict = dotdict({
+			"size": res.size,
+			"td_size": res.td_size,
+			"td_count": res.td_count,
+			"tsk_size": res.tsk_size,
+			"krn_size": res.krn_size,
+			"src_count": res.src_count,
+			"dst_count": res.dst_count,
+			"tiles": res.tiles,
+			"nchw": [0x0] * TILE_COUNT * NCHW_COUNT,
+			})
+
+	my_dict.tiles[0] = ntiles(round_up(res.size, TILE_SIZE))
+
+	for n in range(res.dst_count):
+		nchw = res.nchw[n + res.src_count]
+		my_dict.nchw[(4+n)*NCHW_COUNT:(4+n+1)*NCHW_COUNT] = [nchw.N, nchw.C, nchw.H, nchw.W, nchw.pS, nchw.rS]
+
+	for n in range(res.src_count):
+		nchw = res.nchw[n]
+		my_dict.nchw[(4+res.dst_count+n)*NCHW_COUNT:(4+res.dst_count+n+1)*NCHW_COUNT] = [nchw.N, nchw.C, nchw.H, nchw.W, nchw.pS, nchw.rS]
+
+	return my_dict
+
+
+def _get_name(idx, dst_count):
+	if (idx == 0): return "cmd"
+	if (idx == 1): return "krn"
+	if (idx == 2): return "itm1"
+	if (idx == 3): return "itm0"
+	if (idx >= 4 and idx <  (4 + dst_count)): return "dst%d" % (idx - 4)
+	if (idx >= 4 and idx >= (4 + dst_count)): return "src%d" % (idx - 4 - dst_count)
 
 
 def anect_print(res):
 	print('')
-	print('static const struct ane_model anec_%s = {' % res.name)
-	print('\t.name = "%s",' % res.name)
-	print('\t.input_count = %d,' % res.src_count)
-	print('\t.output_count = %d,' % res.dst_count)
+	print('static const struct anec anec_%s = {' % res.name)
 
-	print('\t.anec = {')
-	print('\t\t.size = 0x%x,' % res.size)
-	print('\t\t.td_size = 0x%x,' % res.td_size)
-	print('\t\t.td_count = 0x%x,' % res.td_count)
-	print('\t\t.tsk_size = 0x%x,' % res.tsk_size)
-	print('\t\t.krn_size = 0x%x,' % res.krn_size)
+	build = res.build
+	print('\t.size = 0x%x,' % build.size)
+	print('\t.td_size = 0x%x,' % build.td_size)
+	print('\t.td_count = 0x%x,' % build.td_count)
+	print('\t.tsk_size = 0x%x,' % build.tsk_size)
+	print('\t.krn_size = 0x%x,' % build.krn_size)
 
-	print('\t\t.tiles[0] = %d, /* 0x%x */' % (ntiles(round_up(res.size, TILE_SIZE)), round_up(res.size, TILE_SIZE)))
-	for n in range(res.itm_count):
-		print('\t\t.tiles[%d] = %d, /* itm%d 0x%x */' % 
-		      (3 + n, res.tiles[3 + n], n, res.itm_sizes[n]))
-	for n in range(res.dst_count):
-		print('\t\t.tiles[%d] = %d, /* dst%d 0x%x */' % 
-		      (4 + n, res.tiles[4 + n], n, res.dst_sizes[n]))
-	for n in range(res.src_count):
-		print('\t\t.tiles[%d] = %d, /* src%d 0x%x */' % 
-		      (4 + res.dst_count + n, res.tiles[4 + res.dst_count + n], n, res.src_sizes[n]))
+	print('\t.src_count = %d,' % build.src_count)
+	print('\t.dst_count = %d,' % build.dst_count)
 
-	print('\t\t.types[%d] = ANE_TILE_CMD,' % (0))
-	for n in range(res.itm_count):
-		print('\t\t.types[%d] = ANE_TILE_ITM,' % (3 + n))
-	for n in range(res.dst_count):
-		print('\t\t.types[%d] = ANE_TILE_DST,' % (4 + n))
-	for n in range(res.src_count):
-		print('\t\t.types[%d] = ANE_TILE_SRC,' % (4 + res.dst_count + n))
-	print('\t},')
+	for n in range(TILE_COUNT):
+		if (build.tiles[n]):
+			print('\t.tiles[%d] = %d, /* %s 0x%x */' % (n, build.tiles[n], _get_name(n, build.dst_count), build.tiles[n] * TILE_SIZE))
 
-	print('\t.data = &_binary_%s_anec_start,' % (res.name))
+	for n in range(TILE_COUNT):
+		nchw = build.nchw[n*NCHW_COUNT : (n+1)*NCHW_COUNT]
+		if (nchw[0]):
+			print('\t.nchw[%d] = {%d, %d, %d, %d, 0x%x, 0x%x}, /* %s */' % (n, nchw[0], nchw[1], nchw[2], nchw[3], nchw[4], nchw[5], _get_name(n, build.dst_count)))
 
-	for n in range(res.dst_count):
-		nchw = res.nchw[n + res.src_count]
-		print('\t.nchw[%d] = {%d, %d, %d, %d, 0x%x, 0x%x}, /* dst%d */' % 
-		(4 + n, nchw.N, nchw.C, nchw.H, nchw.W, nchw.pS, nchw.rS, n))
-
-	for n in range(res.src_count):
-		nchw = res.nchw[n]
-		print('\t.nchw[%d] = {%d, %d, %d, %d, 0x%x, 0x%x}, /* src%d */' % 
-		(4 + res.dst_count + n, nchw.N, nchw.C, nchw.H, nchw.W, nchw.pS, nchw.rS, n))
 	print('};')
 	print('')
 	return
 
 
-def _anect_write_hdr(res, prefix=""):
-	fname = f'anec_{res.name}.h'
-	outpath = os.path.join(prefix, fname)
-	logger.debug(f'writing header to {outpath}')
-	with open(outpath, "w") as f:
-		f.write('#ifndef __ANEC_%s_H__\n' % (res.name.upper()))
-		f.write('#define __ANEC_%s_H__\n' % (res.name.upper()))
-		f.write('\n')
-		f.write('#include "ane.h"\n')
-		f.write('\n')
-		f.write('extern char _binary_%s_anec_start[];\n' % (res.name))
-		f.write('extern char _binary_%s_anec_end[];\n' % (res.name))
-
-		cap = io.StringIO()
-		with contextlib.redirect_stdout(cap):
-			anect_print(res)
-		f.write(cap.getvalue())
-
-		f.write('struct ane_nn *ane_init_%s(void) { return ane_init(&anec_%s); }\n' % (res.name, res.name))
-		f.write('struct ane_nn *__ane_init_%s(int dev_id) { return __ane_init(&anec_%s, dev_id); }\n' % (res.name, res.name))
-		f.write('\n')
-		f.write('#endif /* __ANEC_%s_H__ */\n' % (res.name.upper()))
-	return fname
-
-
-def _anect_write_bin(res, prefix=""):
-	fname = f'{res.name}.anec'
-	outpath = os.path.join(prefix, fname)
-	logger.debug(f'writing kernel to {outpath}')
-	open(outpath, "wb").write(res.data[res.tsk_start:res.tsk_start+res.size])
-	return fname
-
-
 def anect_write(res, prefix):
-	_anect_write_hdr(res, prefix)
-	_anect_write_bin(res, prefix)
+	outpath = os.path.join(prefix, f'{res.name}.anec')
+
+	header = my_format.build(res.build)
+	assert(len(header) <= HEADER_SIZE)
+	header += (b'\0' * (HEADER_SIZE - len(header)))
+
+	content = res.data[res.tsk_start:res.tsk_start+res.size]
+	open(outpath, "wb").write(header + content)
