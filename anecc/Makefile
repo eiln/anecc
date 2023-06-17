@@ -2,4 +2,4 @@
 install:
 	sudo python3 setup.py install
 clean:
-	rm -rf build dist anecc.egg-info
+	rm -rf build dist anect.egg-info

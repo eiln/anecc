@@ -131,4 +131,5 @@ dmypy.json
 *.tmp
 tmp/*
 *.hwx
+*.anec
 

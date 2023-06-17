@@ -1,6 +1,4 @@
-.PHONY: anect anecc
-install: anect anecc
-anect:
-	make -C anect
+.PHONY: anecc
+install: anecc
 anecc:
 	make -C anecc
