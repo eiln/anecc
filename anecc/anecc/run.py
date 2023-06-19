@@ -10,12 +10,12 @@ from anecc import anecc_convert, anecc_print, anecc_compile
 @click.argument('path', required=True, type=click.Path(exists=True))
 @click.option('--name', '-n', type=str, help="Model name")
 @click.option('--out', '-o', type=str, default='', help="Output file name (default $name.anec)")
-@click.option('--dry', '-d', is_flag=True, default=False, help="Don't write anec.")
+@click.option('--write', '-w', is_flag=True, default=False, help="Write anec.")
 @click.option('--print', '-p', 'print_', is_flag=True, default=False, help="Print struct.")
 @click.option('--force', '-f', is_flag=True, default=False, help="Bypass warnings.")
-def run(path, name, out, dry, print_, force):
+def run(path, name, out, write, print_, force):
 	res = anecc_convert(path, name, force)
 	if (print_):
 		anecc_print(res)
-	if (not dry):
+	if (out or write):
 		anecc_compile(res, out)
