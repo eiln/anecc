@@ -22,11 +22,10 @@ logger = logging.getLogger(__name__)
 TILE_SIZE = 0x4000
 BASE_ADDR = 0x30000000
 TD_SIZE = 0x274
-BAR_SIZE = 0x20
+TILE_COUNT = 0x20
 DMA0_GRAN = 16
 TD_MAGIC = 0xf401f800
 
-TILE_COUNT = 0x20
 NCHW_COUNT = 0x6
 HEADER_SIZE = 0x1000
 
@@ -39,20 +38,9 @@ def ntiles(size): return (size // TILE_SIZE)
 def round_up(x, y): return ((x + (y - 1)) & (-y))
 def round_down(x, y): return (x - (x % y))
 
-my_format = Struct(
-    "size" / Int64ul,
-    "td_size" / Int32ul,
-    "td_count" / Int32ul,
-    "tsk_size" / Int64ul,
-    "krn_size" / Int64ul,
-    "src_count" / Int32ul,
-    "dst_count" / Int32ul,
-    "tiles" / Array(TILE_COUNT, Int32ul),
-    "nchw" / Array(TILE_COUNT * NCHW_COUNT, Int64ul),
-)
 
 # https://stackoverflow.com/a/17197027
-def strings(filename, min_len=4):
+def _get_strings(filename, min_len=4):
 	with open(filename, errors="ignore") as f:
 		data = f.read()
 		result = ""
@@ -67,24 +55,10 @@ def strings(filename, min_len=4):
 			yield result
 
 
-def _anecc_get_name(hwxpath, name):
-	if (not name):
-		name = os.path.splitext(os.path.basename(hwxpath))[0]
-	name = name.replace("-", "_").replace(" ", "_").replace(".", "_").lower()
-	# https://stackoverflow.com/a/3303361
-	name = re.sub('[^0-9a-zA-Z_]', '', name)  # Remove invalid characters
-	name = re.sub('^[^a-zA-Z_]+', '', name)  # Remove leading characters until we find a letter or underscore
-	if (not name):
-		name = "model"
-	logger.info(f'using name: {name}')
-	return name
-
-
-def _anecc_get_nchw(hwxpath):
+def _anecc_get_nchw(hwx_path):
 	# strings -n 50 "model.hwx" | grep ":t.*:5$"
-	lines = list(strings(hwxpath, min_len=50))
-	regexp = re.compile(":t.*:5$")
-	stabs = [line for line in lines if re.search(regexp, line)]
+	lines = list(_get_strings(hwx_path, min_len=50))
+	stabs = [line for line in lines if re.search(re.compile(":t.*:5$"), line)]
 	assert(len(stabs) >= 2)
 
 	nchw_l = []
@@ -114,14 +88,16 @@ def _anecc_get_nchw(hwxpath):
 	return nchw_l
 
 
-def anecc_convert(hwxpath, name="model", force=False):
-	if (os.path.splitext(hwxpath)[1] == ".mlmodel"):
+def anecc_convert(hwx_path, name="model", force=False):
+	if (os.path.splitext(hwx_path)[1] == ".mlmodel"):
 		logger.warn("pass the hwx output of coreml2hwx")
 
-	res = dotdict({"path": hwxpath})
-	res.name = _anecc_get_name(hwxpath, name)
+	res = dotdict({"path": hwx_path})
 
-	res.data = open(hwxpath, "rb").read()
+	res.name = os.path.splitext(os.path.basename(hwx_path))[0] if (not name) else name
+	res.name = "model" if not res.name else res.name
+
+	res.data = open(hwx_path, "rb").read()
 	assert ((not len(res.data) % 4))
 	up = struct.unpack('<' + 'L'*(len(res.data) // 4), res.data)
 
@@ -152,10 +128,10 @@ def anecc_convert(hwxpath, name="model", force=False):
 	itm_count = 0
 	src_count = 0
 	dst_count = 0
-	res.itm_sizes = [0] * BAR_SIZE
-	res.src_sizes = [0] * BAR_SIZE
-	res.dst_sizes = [0] * BAR_SIZE
-	for n in range(BAR_SIZE):
+	res.itm_sizes = [0] * TILE_COUNT
+	res.src_sizes = [0] * TILE_COUNT
+	res.dst_sizes = [0] * TILE_COUNT
+	for n in range(TILE_COUNT):
 		try:
 			pos = next(i for i,x in enumerate(up) if (x == buf_addr))
 		except StopIteration:
@@ -190,7 +166,7 @@ def anecc_convert(hwxpath, name="model", force=False):
 	res.update({"itm_count": itm_count, "src_count": src_count,  "dst_count": dst_count})
 
 
-	res.tiles = [0x0] * BAR_SIZE
+	res.tiles = [0x0] * TILE_COUNT
 	for n in range(res.itm_count):
 		res.tiles[3 + n] = ntiles(res.itm_sizes[n])
 	for n in range(res.dst_count):
@@ -207,7 +183,7 @@ def anecc_convert(hwxpath, name="model", force=False):
 	res.update({"tsk_start": tsk_start})
 
 
-	res.nchw = _anecc_get_nchw(hwxpath)
+	res.nchw = _anecc_get_nchw(hwx_path)
 	assert(len(res.nchw) == (src_count + dst_count))
 
 	for i in range(2):
@@ -266,7 +242,7 @@ def _anecc_build(res):
 	return my_dict
 
 
-def _get_name(idx, dst_count):
+def _get_buf_name(idx, dst_count):
 	if (idx == 0): return "cmd"
 	if (idx == 1): return "krn"
 	if (idx == 2): return "itm1"
@@ -291,25 +267,35 @@ def anecc_print(res):
 
 	for n in range(TILE_COUNT):
 		if (build.tiles[n]):
-			print('\t.tiles[%d] = %d, /* %s 0x%x */' % (n, build.tiles[n], _get_name(n, build.dst_count), build.tiles[n] * TILE_SIZE))
+			print('\t.tiles[%d] = %d, /* %s 0x%x */' % (n, build.tiles[n], _get_buf_name(n, build.dst_count), build.tiles[n] * TILE_SIZE))
 
 	for n in range(TILE_COUNT):
 		nchw = build.nchw[n*NCHW_COUNT : (n+1)*NCHW_COUNT]
 		if (nchw[0]):
-			print('\t.nchw[%d] = {%d, %d, %d, %d, 0x%x, 0x%x}, /* %s */' % (n, nchw[0], nchw[1], nchw[2], nchw[3], nchw[4], nchw[5], _get_name(n, build.dst_count)))
+			print('\t.nchw[%d] = {%d, %d, %d, %d, 0x%x, 0x%x}, /* %s */' % (n, nchw[0], nchw[1], nchw[2], nchw[3], nchw[4], nchw[5], _get_buf_name(n, build.dst_count)))
 
 	print('};')
 	print('')
-	return
 
 
 def anecc_compile(res, out):
-	header = my_format.build(res.build)
+	fmt = Struct(
+	    "size" / Int64ul,
+	    "td_size" / Int32ul,
+	    "td_count" / Int32ul,
+	    "tsk_size" / Int64ul,
+	    "krn_size" / Int64ul,
+	    "src_count" / Int32ul,
+	    "dst_count" / Int32ul,
+	    "tiles" / Array(TILE_COUNT, Int32ul),
+	    "nchw" / Array(TILE_COUNT * NCHW_COUNT, Int64ul),
+	)
+	header = fmt.build(res.build)
+
 	assert(len(header) <= HEADER_SIZE)
 	header += (b'\0' * (HEADER_SIZE - len(header)))
 	content = res.data[res.tsk_start:res.tsk_start+res.size]
 
 	outpath = f'{res.name}.anec' if not out else out
 	open(outpath, "wb").write(header + content)
-
 	logger.info(f'compiled anec to: {outpath}')
