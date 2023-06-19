@@ -230,11 +230,11 @@ def anecc_convert(hwxpath, name="model", force=False):
 	for stab in res.nchw:
 		if ("ctx_" in stab.name and (res.src_count > 1)):
 			if (force):
-				logger.warn("bypassing suspected CPU layer warning")
+				logger.warn("Bypassing suspected intermediate CPU layer warning")
 			else:
-				raise RuntimeError("uh oh, looks like there's an unresolved CPU layer.\n"
-						"did you really mean %d inputs? use the -f flag to bypass this." % (res.src_count))
-	
+				raise RuntimeError("Looks like there's an unresolved CPU layer.\n"
+						"Did you really mean %d inputs? use the -f flag to bypass this." % (res.src_count))
+
 	res.build = _anecc_build(res)
 
 	return res
