@@ -1,187 +1,146 @@
 
 # anecc
 
-# WIP (but works on my machine)
-
-> Run a CoreML MLModel on the Asahi Neural Engine
-
-`anecc`, short for "ANE CoreML converter/compiler",
-converts and compiles an Apple CoreML MLModel
-to a Linux executable compatible with [my new driver](https://github.com/eiln/ane).
+`anecc`, short for "ANE CoreML converter/compiler", cuts the middleman to let you directly run a CoreML MLModel on the Neural Engine with [my reverse-engineered Linux driver](https://github.com/eiln/ane).
 
 
 # Installation
 
 From pip:
 
-	pip install anecc
-
+```
+pip install anecc
+```
 
 From source:
 
-	git clone https://github.com/eiln/anecc
-	cd anecc
-	make install
+```
+git clone https://github.com/eiln/anecc.git
+cd anecc
+make install
+```
 
+Verify installation:
 
-Verify installation with:
+```
+Usage: anecc [OPTIONS] PATH
 
-	$ anecc --help
-	Usage: anecc [OPTIONS] PATH
-
-	Options:
-	  -n, --name TEXT    Model name.
-	  -o, --outdir TEXT  Output directory prefix.
-	  -f, --flags TEXT   Additional compiler flags.
-	  -c, --c            Compile to C/C++.
-	  -p, --python       Compile to Python.
-	  -a, --all          Compile to all.
-	  --help             Show this message and exit.
+Options:
+  -n, --name TEXT  Model name
+  -o, --out TEXT   Output file name (default $name.anec)
+  -w, --write      Write anec.
+  -p, --print      Print struct.
+  -f, --force      Bypass warnings.
+  --help           Show this message and exit.
+```
 
 
 # What It Does
 
-On MacOS you can execute a MLModel with:
+On macOS, an MLModel file would be loaded with:
 
-	import coremltools as ct
-	model = ct.models.MLModel("yolov5.mlmodel")
+```
+import coremltools as ct
+model = ct.models.MLModel("yolov5.mlmodel")
+```
 
+`anecc` converts the MLModel into a custom `anec` format that's even easier to load on Linux:
 
-`anecc` compiles a MLModel into either a shared object for Python:
+```
+import ane
+model = ane.model("yolov5.anec")
+```
 
-	import ane
-	model = ane.Model("yolov5.anec.so")
+You'll notice load times are a lot faster than CoreML. And the Python "library" being a mere [50 LOC](https://github.com/eiln/ane/blob/main/bindings/python/python/ane/__init__.py) wrapper around the lightweight gnu99 [C userspace driver library](https://github.com/eiln/ane/blob/main/libane). That's because you actually own your own model.
 
+```
+#include "ane.h"
 
-Or the real deal, a header + object for C/C++/C-likes:
-
-	#include "ane.h"
-	#include "anec_yolov5.h"
-
-	int main(void) {
-		struct ane_nn *nn = ane_init_yolov5();
-		if (nn == NULL) {
-			return -1;
-		}
-		// ...
-		ane_free(nn);
-		return 0;
+int main(void) {
+	struct ane_nn *nn = ane_init("yolov5.anec");
+	if (nn == NULL) {
+		return -1;
 	}
+	// ...
+	ane_free(nn);
+	return 0;
+}
+```
 
-Compiles with `gcc` or `g++`:
+Compile with `gcc` or `g++`:
 
-	g++ -I/usr/include/libane yolov5.anec.o main.c -o main -lane
-
-For details, see [libane.md](https://github.com/eiln/ane/blob/main/libane.md).
-
+```
+g++ -I/usr/include/libane main.c -o main -lane
+```
 
 
 # CoreML Conversion
 
-To create or convert your own MLModel,
-you need to start in MacOS, where a CoreML runtime is available.
+To create or convert your own MLModel, you need to start in macOS, where a CoreML runtime is available. You do not need macOS to run a pre-converted ".anec" model.
 
-You don't need MacOS to run a pre-converted model.
-For that, again, see [libane.md](https://github.com/eiln/ane/blob/main/libane.md).
-
-[TLDR](#tldr) below.
+[TLDR](#tldr) at the bottom.
 
 
-## Step 0. Obtain MLModel
+### Step 0. obtain MLModel
 
-Starting in MacOS-land.
-You should have a "*.mlmodel" file ready.
+Starting in macOS-land. You should have a "*.mlmodel" file ready. Do not use "mlpackages".
+
 See [coreml101.md](coreml101.md).
-I'm continuing "mobilenet.mlmodel" from the torch example.
 
 
-## Step 1. `tohwx`: Compile MLModel -> hwx
+### Step 1. `tohwx`: Compile mlmodel -> hwx
 
+Still in macOS-land.
 
-Still in MacOS-land.
+I kinda lied about the MLModel part. When an MLModel is loaded,
 
-I kinda lied about the MLModel part.
-When a MLModel file is loaded,
+```
+mlmodel = ct.models.MLModel("yolov5.mlmodel")
+```
 
-	mlmodel = ct.models.MLModel("mobilenet.mlmodel")
+the CoreML backend is called to deserialize, convert, and compile the model into a microcode executable on the ANE. Every. Time. I'm unsure whether the concept of "caching" is absent out of apathy, inability, or secrecy. The compiled model, which we must extract, is embedded in a macho suffixed "*.hwx". My guess is "hardware executable".
 
-the CoreML backend is called to re-compile the
-[model specs](coreml101.md#from-builder)
-into one executable on the ANE. Every. Time.
-The compiled model is embedded in a macho suffixed "*.hwx".
-My guess for the name is "hardware executable".
-Sorry "hwx" just isn't as catchy.
+Extract the hwx **under macOS** using `tohwx`, a slimmed down version of [freedomtan's](https://github.com/freedomtan/coreml_to_ane_hwx) obj-c conversion script. Install `tohwx` with:
 
-Obtain the hwx **under MacOS** using `tohwx`, a slimmed down version of [freedomtan's](https://github.com/freedomtan/coreml_to_ane_hwx) conversion script. Install `tohwx` with:
-
-	git clone https://github.com/eiln/anecc.git
-	cd anecc
-	make -C tohwx
-	make -C tohwx install
+```
+git clone https://github.com/eiln/anecc.git
+cd anecc
+make -C tohwx
+make -C tohwx install
+```
 
 Use `tohwx` to convert mlmodel -> hwx:
 
-	$ tohwx mobilenet.mlmodel
-	tohwx: input mlmodel: /Users/eileen/mobilenet.mlmodel
-	tohwx: output hwx: /Users/eileen/mobilenet.hwx
+```
+$ tohwx yolov5.mlmodel
+tohwx: input mlmodel: /Users/eileen/yolov5.mlmodel
+tohwx: output hwx: /Users/eileen/yolov5.hwx
+```
 
-If it fails, it's usually because of CPU layers, which I can't do anything about. Make a pull, attach the mlmodel, and I'll take a look at it.
-
-You can also call `tohwx` in Python:
-
-	import subprocess
-	mlmodel.save("mobilenet.mlmodel")
-	subprocess.run(["tohwx", "mobilenet.mlmodel"])
+If it fails, sorry, I don't know. Make a pull, attach the mlmodel, and I'll take a look at it.
 
 
-## Step 2. `anecc`: Convert & Compile
+### Step 2. `anecc`: convert hwx -> anec
 
-`anecc` first internally [converts](anect/anect/__init__.py) the hwx
-into a data structure needed by the driver.
-Then, the "compilation" portion consists of miscellaneous
-`gcc/ld` commands that wrap the data structure nicely.
+`anecc` is platform independent. You can also use it to check conversion ability or debug the model.
 
-In other words, the actual work is the conversion.
-Since the hwx format is RE'd, the conversion module
-runs a lot of asserts/checks.
-**Please PR if the conversion fails.**
-
-You can run `anecc` in MacOS to ensure it properly converts,
-but it won't generate the compiled objects.
-E.g., MacOS:
-
-	$ anecc mobilenet.hwx -a
-	anecc::warn: compiling is only supported on Linux.
-	anect::info: using name: mobilenet
-	anect::info: found input 1/1: (1, 3, 224, 224)
-	anect::info: found output 1/1: (1, 1, 1, 1000)
-	anecc::warn: Model can convert successfully. Re-run anecc in Linux.
-
-v.s. Linux:
-
-	$ anecc mobilenet.hwx -a
-	anect::info: using name: mobilenet
-	anect::info: found input 1/1: (1, 3, 224, 224)
-	anect::info: found output 1/1: (1, 1, 1, 1000)
-	anecc::info: ld -r -b binary -o mobilenet.anec.o mobilenet.anec
-	anecc::info: compiling for C/C++...
-	anecc::info: gcc -I. -std=gnu99  -I//usr/include/libane -c -o /tmp/tmpffcgxefw/anec_mobilenet.o /tmp/tmpffcgxefw/anec_mobilenet.c
-	anecc::info: created object: /home/eileen/mobilenet.anec.o
-	anecc::info: created header: /home/eileen/anec_mobilenet.h
-	anecc::info: compiling for Python...
-	anecc::info: gcc -I. -std=gnu99  -shared -pthread -fPIC -fno-strict-aliasing -I//usr/include/python3.10 -I//usr/include/libane mobilenet.krn.o /tmp/tmpffcgxefw/pyane_mobilenet.c -o /tmp/tmpffcgxefw/mobilenet.anec.so /usr/lib/libane.a
-	anecc::info: created dylib: /home/eileen/mobilenet.anec.so
+```
+anecc yolov5.hwx -o yolov5.anec
+```
 
 
-## TLDR
+# TLDR
 
-In MacOS,
+In macOS:
 
-	tohwx mobilenet.mlmodel
+```
+tohwx yolov5.mlmodel
+```
 
-Save the resulting "mobilenet.hwx" to Linux partition.
+In macOS or Linux or Windows or whatever:
 
-Then, in Linux,
+```
+anecc yolov5.hwx -o yolov5.anec
+```
 
-	anecc mobilenet.hwx -a
-
+Use the yolov5.anec with libane.
