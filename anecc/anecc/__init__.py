@@ -4,7 +4,6 @@
 # Copyright 2022 Eileen Yoon <eyn@gmx.com>
 
 from construct import Struct, Array, Int32ul, Int64ul
-import platform
 import logging
 import string
 import struct
@@ -305,10 +304,6 @@ def anecc_print(res):
 
 
 def anecc_compile(res, out):
-	if (platform.system() != "Linux"):
-		logger.warn("Compiling is only supported on Linux.")
-		return
-
 	header = my_format.build(res.build)
 	assert(len(header) <= HEADER_SIZE)
 	header += (b'\0' * (HEADER_SIZE - len(header)))
