@@ -1,15 +1,28 @@
 
 # coreml101: Conversion Options
 
+Conversion is:
 
 	import coremltools as ct  # pip install coremltools
+	model = ct.convert(source_model)
 
-
-Three options:
+With three options for `source_model`:
 
 1. [From pytorch](#from-pytorch) -- recommended for neural networks
 2. [From mb](#from-mb) -- recommended for simpler compute passes
 3. [From builder](#from-builder)
+
+
+**WARNING:** Do NOT pass additional params for `ct.convert()`, notably
+
+	convert_to="mlprogram",
+	minimum_deployment_target=ct.target.iOS15,
+	compute_precision=ct.precision.FLOAT32,
+
+Playing with the Python coremltools frontend won't increase chances of ANE compilation. CoreML *always* prioritizes ANE execution, without you telling it, because it's inherently more speed and energy efficient. Additional flags passed will only be an unintentional CPU-only signal. When conversion fails, the model suffers from a hardware limitation, requiring surgery. For that, see [coreml102.md](https://github.com/eiln/anecc/blob/main/coreml102.md). Only pass what's needed.
+
+Create a pull if these methods don't work. I'll look at it and update docs.
+
 
 
 ### From PyTorch
@@ -166,3 +179,4 @@ There is no conversion
 	mlmodel = ct.models.MLModel(builder.spec)
 
 because it's the raw entrypoint to the xml IR.
+
