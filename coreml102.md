@@ -1,0 +1,22 @@
+
+# coreml102: Model Surgery Tips
+
+Tips for when the model doesn't convert or the converted model doesn't run on the ANE. Also a semi documentation on ANE internals. From most effective/urgent to least:
+
+### Static shapes
+Current hardware does **NOT** support arbitrary memory movements. ANE, having no ISA, cannot execute instructions (e.g. shaders or openCL). All tasks must be known and hard-coded at compile time as "configuration states", the poor man's instructions. The entire computation sequence must be encoded in the microcode (model.hwx), including rasterizer & DMA actions. Think of it as a stream of circuit actions triggered by one big red nuclear button (which acutally exists). Three options, in ascending misery: **1)** Use static and known shapes. **2)** Pad shapes to maximum size and compute in full; the Stable Diffusion repo does that. **3)** Set up a m1n1 hypervisor and fish out the intermediate layer. See [this response](https://github.com/ggerganov/whisper.cpp/pull/1021#issuecomment-1597676195) where I semi-remedied a case of an input being an index of context embeddings (arbitrary slicing; there simply isn't a way to guarantee the input lies within embedding dimension bounds, or set a fallback for it). An "indexing circuit" was introduced in ["Indexing Operations In Neural Network Processor" (2023, US20230169316A1)](https://patentimages.storage.googleapis.com/71/67/dd/90659f1e449eba/US20230169316A1.pdf). M3?
+
+### Float input
+I only haven't seriously, publicly denounced them for this yet because I haven't had the time. I'll do a big writeup on this soon. The ANE computes at [**IEEE-754 half-precision floating-point format (FP16 or float16)**](https://en.wikipedia.org/wiki/Half-precision_floating-point_format?&useskin=vector). CoreML only takes FLOAT32 input because they're never going to admit hardware limitations, and would rather lawyer deceit like ["Original implementation of distilbert uses an epsilon value of 1e-12 which is not friendly with the float16 precision that ANE uses by default"](https://github.com/apple/ml-ane-transformers/blob/da64000fa56cc85b0859bc17cb16a3d753b8304a/ane_transformers/huggingface/distilbert.py#L13-L14). Again, declare inputs as FLOAT32 (default option) in CoreML for an unsolicited downcast to FLOAT16 (it conveniently comes back as FLOAT32!). Passing other dtypes, notably int, even if it's completely unused, is an automatic CPU compute unit signal. If the task isn't massive, stupid **float** crunching, it's not for the ANE.
+
+### Bigger the better
+If input/output sizes are too small to reap cost efficiency, the workload will be delegated to the CPU instead. Go for at least a total flattened size of 64.
+
+### Nevermind, not *that* big
+If tensors are lopsided to some inexcusable shape like (50000,), chunk and/or parallelize it.
+
+### Stupidify tasks
+ANE is stupid. It has no ISA. If the model can't be reasonably approximated as some set of FMAs (though assisted with a predetermined, constant weights buffer), it can't be computed. There isn't a definitive list of "banned ops" because the full computation graph is considered; e.g. a model with a single sin/cos layer won't run on the ANE, but the [openapi whisper encoder](https://github.com/openai/whisper/blob/main/whisper/model.py), which uses sinusoids in its positional embedding, does run because approximation loss was determined negligible. This relates to both dynamic shapes (e.g. argsort) and precision (sensitive math e.g. trig), discussed above.
+
+### Pad last axis to a multiple of 64
+ANE, by hardware, uses NCHW format (batch, channel, height, width). See NCHW tiling at [ane_tile.c](https://github.com/eiln/ane/blob/main/libane/src/ane_tile.c). Tensors do not need to be 4D, and it will be unsqueezed to 4D if necessary; that's easy. Forcing 4D rarely helps. More important is the last axis being padded to a multiple of 64. Again, it's not an absolute requirement, but it's worth a try on bigger neural nets. The 64 derives from the engine's unit of operation (segments) of inputs, or a "portion of the input data having a size that produces output values that fit into accumulator of neural engine during a single cycle of the computation core". Read ["Compression of kernel data for neural network operations" (2019, US11120327B2)](https://patentimages.storage.googleapis.com/2e/68/31/cf2d86dda06fb9/US20190340488A1.pdf) if you too are a miserable fuck.

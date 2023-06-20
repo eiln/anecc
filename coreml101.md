@@ -1,27 +1,26 @@
 
-# coreml101
+# coreml101: Conversion Options
+
 
 	import coremltools as ct  # pip install coremltools
 
 
 Three options:
 
-1. [From pytorch](#from-pytorch) -- recommded for neural networks
-2. [From mb](#from-mb) -- recommded for compute passes
+1. [From pytorch](#from-pytorch) -- recommended for neural networks
+2. [From mb](#from-mb) -- recommended for simpler compute passes
 3. [From builder](#from-builder)
 
 
+### From PyTorch
 
-## From pytorch
-
-First load a torch model as normal;
-e.g. pretrained from hub:
+Load a torch model as normal, e.g. pretrained from torch hub:
 
 	model = torch.hub.load('pytorch/vision:v0.11.0', 'fcn_resnet50', pretrained=True).eval()
 	model = torchvision.models.mobilenet_v2(pretrained=True).eval()
 
 
-or a custom torch.nn module:
+Or a custom torch.nn module:
 
 	class Log10(nn.Module):
 	    def __init__(self):
@@ -32,25 +31,10 @@ or a custom torch.nn module:
 	model = Log10().eval()
 
 
-The forward pass must be composed of pure torch functions,
-i.e. no numpy or python len().
-To see all available torch ops:
+The forward pass must be composed of pure torch functions, i.e. no numpy or len(). To see all available torch ops:
 
 	curl https://raw.githubusercontent.com/apple/coremltools/main/coremltools/converters/mil/frontend/torch/ops.py  \
 		| grep "@register_torch_op" -A 1 | grep "^def"
-
-
-Extract key in inherited module it complains about dict outputs:
-
-	class FCNWrap(nn.Module):
-	    def __init__(self):
-	        super(FCNWrap, self).__init__()
-	        self.model = torch.hub.load('pytorch/vision:v0.11.0', fcn_resnet50').eval()
-	    def forward(self, x):
-	        res = self.model(x)
-	        x = res["out"]
-	        return x
-	model = FCNWrap().eval()
 
 
 Finally, convert:
@@ -76,7 +60,7 @@ Simple runnable example using pretrained weights:
 	mlmodel.save("mobilenet.mlmodel")
 
 
-Another runnable example but with two inputs:
+Another runnable example using two inputs:
 
 	import coremltools as ct
 	import torch
@@ -99,13 +83,12 @@ Another runnable example but with two inputs:
 
 
 
-## From MB
+### From MB
 
 	from coremltools.converters.mil import Builder as mb
 
 
-As the torch/ops.py source from above shows,
-torch conversion comes down to resolving torch ops -> MB ops:
+Torch conversion comes down to resolving torch ops into MB ops:
 
 	@register_torch_op
 	def true_divide(context, node):
@@ -114,8 +97,7 @@ torch conversion comes down to resolving torch ops -> MB ops:
 	    context.add(res)
 
 
-MB is a convinience decorator around Builder.
-It's nice for extracting isolated compute passes, e.g.,
+MB is a convinience decorator around Builder. It's nice for extracting isolated compute passes like:
 
 	@mb.program(input_specs=[mb.TensorSpec(shape=(512, 640))])
 	def sqrt(x):
@@ -132,7 +114,7 @@ Two inputs:
 	    return x
 
 
-Then convert with decorated function name:
+Convert with decorated function name:
 
 	mlmodel = ct.convert(matmul)
 
@@ -143,7 +125,7 @@ To see all MB ops,
 		| grep "@register_mil_to_nn_mapping" -A 1 | grep "^def"
 
 
-Runnable example that does element-wise addition:
+Runnable example for element-wise addition:
 
 	import coremltools as ct
 	from coremltools.converters.mil import Builder as mb
@@ -157,27 +139,16 @@ Runnable example that does element-wise addition:
 	mlmodel = ct.convert(add)
 
 
-P.S. if anyone with enough time and SSD 
-is willing to mass convert matmul kernels do lmk.
 
-
-
-## From Builder
+### From Builder
 
 	from coremltools.models.neural_network import NeuralNetworkBuilder
 	from coremltools.models import neural_network, datatypes
 
 
-All the conversion methods essentially come down to building the model "spec".
-The model spec is a DAG (graph) of passes connected by dict keys.
-When ct.models.MLModel(spec) is called, the spec, formatted as an XML/plist,
-is fed into ANECompiler.
+All the conversion methods essentially come down to building the model "spec", a DAG (graph) of passes connected by dict keys. When ct.models.MLModel(spec) is called, the spec, formatted as an XML/plist, is fed into ANECompiler.
 
-The raw interface to this spec-building is NeuralNetworkBuilder.
-It's verbose as shit and really fucking anal about dict key names.
-Why passes aren't positional I don't know.
-I totally see MB being born out of this concern.
-Use MB if you can, but Builder does grant the finest control.
+The raw interface to this spec-building is NeuralNetworkBuilder. True to its name, it's verbose as fuck and really fucking anal about dict key names. Perhaps there is a deeper philosophy behind passes not being positional. MB was most definitely born out of the misery of Builder. Use MB if you can, but Builder, the lowest level, does grant the finest control.
 
 	input_features = [("x", datatypes.Array(*(10, 20, 30)))]
 	output_features = [("output", None)]
@@ -195,4 +166,3 @@ There is no conversion
 	mlmodel = ct.models.MLModel(builder.spec)
 
 because it's the raw entrypoint to the xml IR.
-
